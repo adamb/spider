@@ -313,7 +313,7 @@ function generateProbesHTML(probes) {
       
       return `
         <tr>
-          <td>${probe.name || probe.id}</td>
+          <td><a href="/probes/${probe.id}/details" class="probe-link">${probe.name || probe.id}</a></td>
           <td><code>${probe.id}</code></td>
           <td>${probeTypeLabel}</td>
           <td>${valueString}</td>
@@ -429,6 +429,14 @@ function generateProbesHTML(probes) {
             color: #666;
             font-weight: normal;
             font-size: 0.9em;
+        }
+        .probe-link {
+            color: #1976d2;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .probe-link:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -550,6 +558,201 @@ async function checkDeviceHealth(env) {
   }
 }
 
+async function handleProbeDetailsPage(env, probeId) {
+  try {
+    // Check for required environment variables
+    if (!env.THERM_PORTAL_USER || !env.THERM_PORTAL_SESSION) {
+      return new Response('Authentication not configured', {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    }
+
+    // Get probe data
+    const apiUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/probes/${probeId}`;
+    const cookieHeader = `THERM_PORTAL_USER=${env.THERM_PORTAL_USER}; THERM_PORTAL_SESSION=${env.THERM_PORTAL_SESSION}`;
+
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Cookie': cookieHeader,
+        'User-Agent': 'spider-proxy/1.0',
+      },
+    });
+
+    if (!response.ok) {
+      return new Response(`Failed to fetch probe details: ${response.status}`, {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    }
+
+    const data = await response.json();
+    
+    // Generate HTML
+    const html = generateProbeDetailsHTML(data, probeId);
+    
+    return new Response(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+
+  } catch (error) {
+    return new Response(`Error: ${error.message}`, {
+      status: 500,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }
+}
+
+function generateProbeDetailsHTML(probeData, probeId) {
+  const formattedJson = JSON.stringify(probeData, null, 2);
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Probe Details: ${probeData.name || probeId} - Spider Proxy</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin: 0;
+        }
+        .back-btn {
+            background-color: #666;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .back-btn:hover {
+            background-color: #555;
+        }
+        .probe-summary {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .summary-item {
+            margin: 5px 0;
+        }
+        .summary-label {
+            font-weight: 600;
+            color: #555;
+        }
+        .json-section {
+            margin-top: 20px;
+        }
+        .json-section h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        pre {
+            background-color: #f1f3f4;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        code {
+            background-color: #f1f3f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>${probeData.name || probeId}</h1>
+            <a href="/probes" class="back-btn">← Back to Probes</a>
+        </div>
+        
+        <div class="probe-summary">
+            <div class="summary-item">
+                <span class="summary-label">ID:</span> <code>${probeData.id}</code>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Type:</span> ${getProbeTypeLabel(probeData.probetype)}
+            </div>
+            ${probeData.value !== null && probeData.value !== undefined ? `
+            <div class="summary-item">
+                <span class="summary-label">Current Value:</span> ${formatProbeValue(probeData)}
+            </div>
+            ` : ''}
+            <div class="summary-item">
+                <span class="summary-label">Last Reading:</span> ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Status:</span> ${probeData.seen ? '🟢 Active' : '🔴 Inactive'}
+            </div>
+        </div>
+        
+        <div class="json-section">
+            <h3>Raw API Response</h3>
+            <pre><code>${formattedJson}</code></pre>
+        </div>
+    </div>
+</body>
+</html>
+  `;
+}
+
+function getProbeTypeLabel(probetype) {
+  const labels = {
+    'tf': 'Temperature',
+    'rh': 'Humidity',
+    '': 'Other'
+  };
+  return labels[probetype] || probetype || 'Unknown';
+}
+
+function formatProbeValue(probeData) {
+  if (probeData.value === null || probeData.value === undefined) {
+    return '—';
+  }
+  
+  if (probeData.probetype === 'tf') {
+    const fahrenheit = (probeData.value * 9/5) + 32;
+    return `${fahrenheit.toFixed(1)}°F (${probeData.value}°C)`;
+  } else if (probeData.probetype === 'rh') {
+    return `${probeData.value}%`;
+  } else {
+    return probeData.value.toString();
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     try {
@@ -587,6 +790,12 @@ export default {
       // Handle /probes page
       if (url.pathname === '/probes') {
         return handleProbesPage(env);
+      }
+      
+      // Handle /probes/{probe_id}/details page
+      if (url.pathname.startsWith('/probes/') && url.pathname.endsWith('/details')) {
+        const probeId = url.pathname.slice('/probes/'.length, -'/details'.length);
+        return handleProbeDetailsPage(env, probeId);
       }
       
       const targetUrl = new URL(url.pathname + url.search, TARGET_URL);
