@@ -75,10 +75,30 @@ Returns detailed sensor probe information:
 }
 ```
 
+#### Get Probe Value
+```bash
+curl https://spider.dev.pr/api/probes/4c7525046c96-101252130008001E
+```
+
+Returns current value and details for a specific probe:
+```json
+{
+  "id": "4c7525046c96-101252130008001E",
+  "name": "Freezer Temp",
+  "probetype": "tf",
+  "last": 1753993639,
+  "seen": true,
+  "time_last": "2025-07-31T16:27:19",
+  "value": -18.44
+}
+```
+
 **Field Definitions:**
 - `last`: Unix timestamp of when the device/probe last reported data
 - `probetype`: Sensor type ("rh" = humidity, "tf" = temperature, "" = other)
 - `seen`: Boolean indicating if the probe is currently active/visible
+- `time_last`: Human-readable timestamp of last reading (ISO format)
+- `value`: Current sensor reading (temperature in Celsius, humidity %, etc.)
 
 ## Technical Details
 
