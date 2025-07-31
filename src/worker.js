@@ -7,6 +7,8 @@ export default {
       const url = new URL(request.url);
       const targetUrl = new URL(url.pathname + url.search, TARGET_URL);
       
+      console.log(`Proxy request: ${request.url} -> ${targetUrl.toString()}`);
+      
       // Create cache key
       const cacheKey = new Request(targetUrl.toString(), {
         method: request.method,
