@@ -3,6 +3,8 @@ const CACHE_TTL = 300; // 5 minutes
 const DEVICE_TIMEOUT = 30 * 60; // 30 minutes - consider device offline if no report
 const FREEZER_PROBE_ID = '4c7525046c96-101252130008001E';
 const FREEZER_MAX_TEMP = -5.56; // Maximum safe freezer temperature in Fahrenheit
+const HUMIDITY_PROBE_ID = '4c7525046c96-0e76b286d29e_rh';
+const HUMIDITY_MAX_LEVEL = 55; // Maximum safe humidity percentage
 
 async function handleDevicesAPI(env) {
   try {
@@ -556,6 +558,9 @@ async function checkDeviceHealth(env) {
     // Check freezer temperature
     await checkFreezerTemperature(env);
 
+    // Check humidity level
+    await checkHumidityLevel(env);
+
   } catch (error) {
     console.error('Error in device health check:', error);
     await sendPushoverNotification(env, `Device health check failed: ${error.message}`, "Thermweb Monitor Error");
@@ -613,6 +618,60 @@ async function checkFreezerTemperature(env) {
   } catch (error) {
     console.error('Error checking freezer temperature:', error);
     await sendPushoverNotification(env, `Freezer temperature check failed: ${error.message}`, "Thermweb Monitor Error");
+  }
+}
+
+async function checkHumidityLevel(env) {
+  try {
+    console.log('Checking humidity level...');
+    
+    // Check for required environment variables
+    if (!env.THERM_PORTAL_USER || !env.THERM_PORTAL_SESSION) {
+      console.error('Missing authentication configuration for humidity check');
+      return;
+    }
+
+    // Get humidity probe data
+    const apiUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/probes/${HUMIDITY_PROBE_ID}`;
+    const cookieHeader = `THERM_PORTAL_USER=${env.THERM_PORTAL_USER}; THERM_PORTAL_SESSION=${env.THERM_PORTAL_SESSION}`;
+
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Cookie': cookieHeader,
+        'User-Agent': 'spider-proxy/1.0-cron',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Humidity probe API request failed with status ${response.status}`);
+      return;
+    }
+
+    const probeData = await response.json();
+    
+    // Check if we have a valid humidity reading
+    if (probeData.value === null || probeData.value === undefined) {
+      console.log('No humidity reading available');
+      return;
+    }
+
+    const currentHumidity = probeData.value;
+    console.log(`Humidity level: ${currentHumidity}% (threshold: ${HUMIDITY_MAX_LEVEL}%)`);
+
+    // Check if humidity is above the safe threshold
+    if (currentHumidity > HUMIDITY_MAX_LEVEL) {
+      const message = `💧 HUMIDITY ALERT: Level is ${currentHumidity}% (above safe limit of ${HUMIDITY_MAX_LEVEL}%)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
+      
+      await sendPushoverNotification(env, message, "💧 Humidity Level Alert");
+      console.log(`Sent humidity alert: ${currentHumidity}% > ${HUMIDITY_MAX_LEVEL}%`);
+    } else {
+      console.log('Humidity level is within safe range');
+    }
+
+  } catch (error) {
+    console.error('Error checking humidity level:', error);
+    await sendPushoverNotification(env, `Humidity level check failed: ${error.message}`, "Thermweb Monitor Error");
   }
 }
 
