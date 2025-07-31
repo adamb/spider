@@ -194,6 +194,184 @@ async function handleProbeValueAPI(env, probeId) {
   }
 }
 
+async function handleProbesPage(env) {
+  try {
+    // Check for required environment variables
+    if (!env.THERM_PORTAL_USER || !env.THERM_PORTAL_SESSION) {
+      return new Response('Authentication not configured', {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    }
+
+    // Get probes data
+    const apiUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/probes`;
+    const cookieHeader = `THERM_PORTAL_USER=${env.THERM_PORTAL_USER}; THERM_PORTAL_SESSION=${env.THERM_PORTAL_SESSION}`;
+
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Cookie': cookieHeader,
+        'User-Agent': 'spider-proxy/1.0',
+      },
+    });
+
+    if (!response.ok) {
+      return new Response(`Failed to fetch probes: ${response.status}`, {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    }
+
+    const data = await response.json();
+    
+    // Generate HTML
+    const html = generateProbesHTML(data.probes || []);
+    
+    return new Response(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+
+  } catch (error) {
+    return new Response(`Error: ${error.message}`, {
+      status: 500,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }
+}
+
+function generateProbesHTML(probes) {
+  const probeRows = probes.map(probe => {
+    const lastTime = new Date(probe.last * 1000).toLocaleString();
+    const status = probe.seen ? '🟢 Active' : '🔴 Inactive';
+    const probeTypeLabel = {
+      'tf': 'Temperature',
+      'rh': 'Humidity',
+      '': 'Other'
+    }[probe.probetype] || probe.probetype || 'Unknown';
+    
+    return `
+      <tr>
+        <td>${probe.name || probe.id}</td>
+        <td><code>${probe.id}</code></td>
+        <td>${probeTypeLabel}</td>
+        <td>${status}</td>
+        <td>${lastTime}</td>
+        <td><a href="/api/probes/${probe.id}" target="_blank">Get Value</a></td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Thermweb Probes - Spider Proxy</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        code {
+            background-color: #f1f3f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        a {
+            color: #1976d2;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .refresh-btn {
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .refresh-btn:hover {
+            background-color: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Thermweb Probes</h1>
+            <button class="refresh-btn" onclick="location.reload()">Refresh</button>
+        </div>
+        
+        <p>Total probes: <strong>${probes.length}</strong></p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Probe ID</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Last Seen</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${probeRows}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+  `;
+}
+
 async function sendPushoverNotification(env, message, title = "Device Alert") {
   try {
     if (!env.PUSHOVER_TOKEN || !env.PUSHOVER_USER) {
@@ -328,6 +506,11 @@ export default {
       if (url.pathname.startsWith('/api/probes/') && url.pathname.length > '/api/probes/'.length) {
         const probeId = url.pathname.slice('/api/probes/'.length);
         return handleProbeValueAPI(env, probeId);
+      }
+      
+      // Handle /probes page
+      if (url.pathname === '/probes') {
+        return handleProbesPage(env);
       }
       
       const targetUrl = new URL(url.pathname + url.search, TARGET_URL);
