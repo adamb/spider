@@ -16,10 +16,39 @@ This project provides secure HTTPS access to the HTTP-only lab.spiderplant.com w
 
 ## Usage
 
+### Web Proxy
 Replace `http://lab.spiderplant.com` with `https://spider.dev.pr` in any URL:
 
 - Original: `http://lab.spiderplant.com/tw/open.html?viewname=FDM`
 - Proxied: `https://spider.dev.pr/tw/open.html?viewname=FDM`
+
+### API Endpoints
+The proxy provides authenticated API endpoints that automatically handle authentication:
+
+#### Get Devices
+```bash
+curl https://spider.dev.pr/api/devices
+```
+
+Returns device information including last report timestamps:
+```json
+{
+  "devices": {
+    "4c7525046c96": {
+      "id": "4c7525046c96", 
+      "name": "Storage",
+      "last": 1753992739
+    },
+    "44179312cc0f": {
+      "id": "44179312cc0f",
+      "name": "Tanks", 
+      "last": 1753992707
+    }
+  }
+}
+```
+
+The `last` field contains Unix timestamps of when each device last reported data.
 
 ## Technical Details
 
@@ -27,4 +56,17 @@ Replace `http://lab.spiderplant.com` with `https://spider.dev.pr` in any URL:
 - **Cache TTL**: 5 minutes for successful GET requests
 - **CORS**: Enabled for all origins with standard headers
 - **Redirects**: Automatically rewritten to maintain proxy domain
+- **Authentication**: API endpoints use environment variables for secure credential storage
+
+## Setup
+
+### Environment Variables
+The API endpoints require authentication credentials stored as Cloudflare Worker secrets:
+
+```bash
+wrangler secret put THERM_PORTAL_USER
+wrangler secret put THERM_PORTAL_SESSION
+```
+
+These are stored securely and not included in the repository.
 
