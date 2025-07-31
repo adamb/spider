@@ -3,9 +3,6 @@ main = "src/worker.js"
 compatibility_date = "2024-07-31"
 compatibility_flags = ["nodejs_compat"]
 
-[env.production]
-route = "spider.dev.pr/*"
-
-[[env.production.routes]]
+[[routes]]
 pattern = "spider.dev.pr/*"
 zone_name = "dev.pr"
