@@ -300,8 +300,7 @@ function generateProbesHTML(probes) {
       let valueString = '';
       if (probe.value !== null && probe.value !== undefined) {
         if (probe.probetype === 'tf') {
-          const fahrenheit = (probe.value * 9/5) + 32;
-          valueString = `${fahrenheit.toFixed(1)}°F`;
+          valueString = `${probe.value}°F`;
         } else if (probe.probetype === 'rh') {
           valueString = `${probe.value}%`;
         } else {
@@ -744,8 +743,8 @@ function formatProbeValue(probeData) {
   }
   
   if (probeData.probetype === 'tf') {
-    const fahrenheit = (probeData.value * 9/5) + 32;
-    return `${fahrenheit.toFixed(1)}°F (${probeData.value}°C)`;
+    const celsius = (probeData.value - 32) * 5/9;
+    return `${probeData.value}°F (${celsius.toFixed(1)}°C)`;
   } else if (probeData.probetype === 'rh') {
     return `${probeData.value}%`;
   } else {
