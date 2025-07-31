@@ -6,3 +6,6 @@ compatibility_flags = ["nodejs_compat"]
 [[routes]]
 pattern = "spider.dev.pr/*"
 zone_name = "dev.pr"
+
+[triggers]
+crons = ["*/15 * * * *"]

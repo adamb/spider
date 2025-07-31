@@ -1,5 +1,6 @@
 const TARGET_URL = 'http://lab.spiderplant.com';
 const CACHE_TTL = 300; // 5 minutes
+const DEVICE_TIMEOUT = 30 * 60; // 30 minutes - consider device offline if no report
 
 async function handleDevicesAPI(env) {
   try {
@@ -62,6 +63,108 @@ async function handleDevicesAPI(env) {
         'Access-Control-Allow-Origin': '*',
       },
     });
+  }
+}
+
+async function sendPushoverNotification(env, message, title = "Device Alert") {
+  try {
+    if (!env.PUSHOVER_TOKEN || !env.PUSHOVER_USER) {
+      console.error('Missing Pushover credentials');
+      return false;
+    }
+
+    const response = await fetch('https://api.pushover.net/1/messages.json', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        token: env.PUSHOVER_TOKEN,
+        user: env.PUSHOVER_USER,
+        message: message,
+        title: title,
+        priority: 1, // High priority
+      }),
+    });
+
+    const result = await response.json();
+    if (response.ok && result.status === 1) {
+      console.log('Pushover notification sent successfully');
+      return true;
+    } else {
+      console.error('Pushover notification failed:', result);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error sending Pushover notification:', error);
+    return false;
+  }
+}
+
+async function checkDeviceHealth(env) {
+  try {
+    console.log('Running device health check...');
+    
+    // Get device data using the same logic as the API endpoint
+    if (!env.THERM_PORTAL_USER || !env.THERM_PORTAL_SESSION) {
+      console.error('Missing authentication configuration for health check');
+      return;
+    }
+
+    const apiUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/devices`;
+    const cookieHeader = `THERM_PORTAL_USER=${env.THERM_PORTAL_USER}; THERM_PORTAL_SESSION=${env.THERM_PORTAL_SESSION}`;
+
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Cookie': cookieHeader,
+        'User-Agent': 'spider-proxy/1.0-cron',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Device API request failed with status ${response.status}`);
+      return;
+    }
+
+    const data = await response.json();
+    const currentTime = Math.floor(Date.now() / 1000);
+    const offlineDevices = [];
+
+    // Check each device
+    if (data.devices) {
+      for (const [deviceId, device] of Object.entries(data.devices)) {
+        const timeSinceLastReport = currentTime - device.last;
+        
+        if (timeSinceLastReport > DEVICE_TIMEOUT) {
+          const minutesOffline = Math.floor(timeSinceLastReport / 60);
+          offlineDevices.push({
+            id: deviceId,
+            name: device.name,
+            minutesOffline: minutesOffline,
+            lastSeen: new Date(device.last * 1000).toLocaleString()
+          });
+        }
+      }
+    }
+
+    // Send alerts for offline devices
+    if (offlineDevices.length > 0) {
+      const deviceList = offlineDevices
+        .map(d => `${d.name} (${d.minutesOffline}min offline, last seen: ${d.lastSeen})`)
+        .join('\n');
+      
+      const message = `${offlineDevices.length} device(s) offline:\n${deviceList}`;
+      
+      await sendPushoverNotification(env, message, "Thermweb Device Alert");
+      console.log(`Sent alert for ${offlineDevices.length} offline devices`);
+    } else {
+      console.log('All devices are online');
+    }
+
+  } catch (error) {
+    console.error('Error in device health check:', error);
+    await sendPushoverNotification(env, `Device health check failed: ${error.message}`, "Thermweb Monitor Error");
   }
 }
 
@@ -161,5 +264,10 @@ export default {
         },
       });
     }
+  },
+
+  async scheduled(event, env, ctx) {
+    console.log('Cron trigger fired:', event.cron);
+    ctx.waitUntil(checkDeviceHealth(env));
   },
 };
