@@ -281,7 +281,8 @@ function generateProbesHTML(probes) {
     let valueString = '';
     if (probe.value !== null && probe.value !== undefined) {
       if (probe.probetype === 'tf') {
-        valueString = `${probe.value}°C`;
+        const fahrenheit = (probe.value * 9/5) + 32;
+        valueString = `${fahrenheit.toFixed(1)}°F`;
       } else if (probe.probetype === 'rh') {
         valueString = `${probe.value}%`;
       } else {
