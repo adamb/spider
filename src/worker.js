@@ -31,15 +31,17 @@ export default {
         
         // Cache successful responses
         if (response.ok && request.method === 'GET') {
-          const responseToCache = new Response(response.body, {
-            status: response.status,
-            statusText: response.statusText,
-            headers: {
-              ...Object.fromEntries(response.headers),
-              'Cache-Control': `max-age=${CACHE_TTL}`,
-            },
+          const responseToCache = response.clone();
+          const cacheHeaders = new Headers(responseToCache.headers);
+          cacheHeaders.set('Cache-Control', `max-age=${CACHE_TTL}`);
+          
+          const responseForCache = new Response(responseToCache.body, {
+            status: responseToCache.status,
+            statusText: responseToCache.statusText,
+            headers: cacheHeaders,
           });
-          ctx.waitUntil(cache.put(cacheKey, responseToCache));
+          
+          ctx.waitUntil(cache.put(cacheKey, responseForCache));
         }
       }
       
