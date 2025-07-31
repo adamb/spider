@@ -1,6 +1,8 @@
 const TARGET_URL = 'http://lab.spiderplant.com';
 const CACHE_TTL = 300; // 5 minutes
 const DEVICE_TIMEOUT = 30 * 60; // 30 minutes - consider device offline if no report
+const FREEZER_PROBE_ID = '4c7525046c96-101252130008001E';
+const FREEZER_MAX_TEMP = -5.56; // Maximum safe freezer temperature in Fahrenheit
 
 async function handleDevicesAPI(env) {
   try {
@@ -551,9 +553,66 @@ async function checkDeviceHealth(env) {
       console.log('All devices are online');
     }
 
+    // Check freezer temperature
+    await checkFreezerTemperature(env);
+
   } catch (error) {
     console.error('Error in device health check:', error);
     await sendPushoverNotification(env, `Device health check failed: ${error.message}`, "Thermweb Monitor Error");
+  }
+}
+
+async function checkFreezerTemperature(env) {
+  try {
+    console.log('Checking freezer temperature...');
+    
+    // Check for required environment variables
+    if (!env.THERM_PORTAL_USER || !env.THERM_PORTAL_SESSION) {
+      console.error('Missing authentication configuration for freezer check');
+      return;
+    }
+
+    // Get freezer probe data
+    const apiUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/probes/${FREEZER_PROBE_ID}`;
+    const cookieHeader = `THERM_PORTAL_USER=${env.THERM_PORTAL_USER}; THERM_PORTAL_SESSION=${env.THERM_PORTAL_SESSION}`;
+
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Cookie': cookieHeader,
+        'User-Agent': 'spider-proxy/1.0-cron',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Freezer probe API request failed with status ${response.status}`);
+      return;
+    }
+
+    const probeData = await response.json();
+    
+    // Check if we have a valid temperature reading
+    if (probeData.value === null || probeData.value === undefined) {
+      console.log('No temperature reading available for freezer');
+      return;
+    }
+
+    const currentTemp = probeData.value; // Already in Fahrenheit
+    console.log(`Freezer temperature: ${currentTemp}°F (threshold: ${FREEZER_MAX_TEMP}°F)`);
+
+    // Check if temperature is above the safe threshold
+    if (currentTemp > FREEZER_MAX_TEMP) {
+      const message = `🚨 FREEZER ALERT: Temperature is ${currentTemp}°F (above safe limit of ${FREEZER_MAX_TEMP}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
+      
+      await sendPushoverNotification(env, message, "🧊 Freezer Temperature Alert");
+      console.log(`Sent freezer temperature alert: ${currentTemp}°F > ${FREEZER_MAX_TEMP}°F`);
+    } else {
+      console.log('Freezer temperature is within safe range');
+    }
+
+  } catch (error) {
+    console.error('Error checking freezer temperature:', error);
+    await sendPushoverNotification(env, `Freezer temperature check failed: ${error.message}`, "Thermweb Monitor Error");
   }
 }
 
