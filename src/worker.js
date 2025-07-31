@@ -66,47 +66,6 @@ async function handleDevicesAPI(env) {
   }
 }
 
-async function handlePushoverTest(env) {
-  try {
-    const testMessage = `Test notification from Spider proxy at ${new Date().toLocaleString()}`;
-    const success = await sendPushoverNotification(env, testMessage, "Spider Test");
-    
-    if (success) {
-      return new Response(JSON.stringify({
-        success: true,
-        message: "Pushover test notification sent successfully"
-      }), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
-    } else {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "Failed to send Pushover notification"
-      }), {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
-    }
-  } catch (error) {
-    return new Response(JSON.stringify({
-      success: false,
-      error: `Test failed: ${error.message}`
-    }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
-  }
-}
 
 async function sendPushoverNotification(env, message, title = "Device Alert") {
   try {
@@ -231,11 +190,6 @@ export default {
       // Handle /api/devices endpoint
       if (url.pathname === '/api/devices') {
         return handleDevicesAPI(env);
-      }
-      
-      // Handle /api/test-pushover endpoint
-      if (url.pathname === '/api/test-pushover') {
-        return handlePushoverTest(env);
       }
       
       const targetUrl = new URL(url.pathname + url.search, TARGET_URL);
