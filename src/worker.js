@@ -255,7 +255,7 @@ async function handleProbesPage(env) {
     );
     
     // Generate HTML
-    const html = generateProbesHTML(probesWithValues);
+    const html = generateProbesHTML(probesWithValues, env);
     
     return new Response(html, {
       status: 200,
@@ -273,7 +273,10 @@ async function handleProbesPage(env) {
   }
 }
 
-function generateProbesHTML(probes) {
+function generateProbesHTML(probes, env) {
+  // Generate alerts section
+  const alertsSection = generateAlertsSection(probes);
+  
   // Group probes by device ID (first part of probe ID before the first hyphen)
   const deviceGroups = {};
   const deviceNames = {
@@ -441,6 +444,43 @@ function generateProbesHTML(probes) {
         .probe-link:hover {
             text-decoration: underline;
         }
+        .alerts-section {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .alerts-section.no-alerts {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .alerts-section h3 {
+            margin-top: 0;
+            color: #856404;
+            font-size: 1.1em;
+        }
+        .alerts-section.no-alerts h3 {
+            color: #155724;
+        }
+        .alert-item {
+            padding: 8px 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .alert-item.warning {
+            background-color: #ffeaa7;
+            border-color: #fdd835;
+            color: #856404;
+        }
+        .alert-item.ok {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
     </style>
 </head>
 <body>
@@ -451,6 +491,8 @@ function generateProbesHTML(probes) {
         </div>
         
         <p>Total probes: <strong>${probes.length}</strong></p>
+        
+        ${alertsSection}
         
         ${deviceSections}
     </div>
@@ -843,6 +885,66 @@ function generateProbeDetailsHTML(probeData, probeId) {
     </div>
 </body>
 </html>
+  `;
+}
+
+function generateAlertsSection(probes) {
+  const alerts = [];
+  
+  // Check freezer temperature
+  const freezerProbe = probes.find(p => p.id === FREEZER_PROBE_ID);
+  if (freezerProbe && freezerProbe.value !== null && freezerProbe.value !== undefined) {
+    if (freezerProbe.value > FREEZER_MAX_TEMP) {
+      alerts.push({
+        type: 'error',
+        icon: '🧊',
+        message: `Freezer temperature: ${freezerProbe.value}°F (above safe limit of ${FREEZER_MAX_TEMP}°F)`,
+        probe: freezerProbe.name || 'Freezer Temp'
+      });
+    } else {
+      alerts.push({
+        type: 'ok',
+        icon: '🧊',
+        message: `Freezer temperature: ${freezerProbe.value}°F (within safe range)`,
+        probe: freezerProbe.name || 'Freezer Temp'
+      });
+    }
+  }
+  
+  // Check humidity level
+  const humidityProbe = probes.find(p => p.id === HUMIDITY_PROBE_ID);
+  if (humidityProbe && humidityProbe.value !== null && humidityProbe.value !== undefined) {
+    if (humidityProbe.value > HUMIDITY_MAX_LEVEL) {
+      alerts.push({
+        type: 'error',
+        icon: '💧',
+        message: `Humidity level: ${humidityProbe.value}% (above safe limit of ${HUMIDITY_MAX_LEVEL}%)`,
+        probe: humidityProbe.name || 'Built in humidity'
+      });
+    } else {
+      alerts.push({
+        type: 'ok',
+        icon: '💧',
+        message: `Humidity level: ${humidityProbe.value}% (within safe range)`,
+        probe: humidityProbe.name || 'Built in humidity'
+      });
+    }
+  }
+  
+  const hasAlerts = alerts.some(alert => alert.type === 'error');
+  const sectionClass = hasAlerts ? 'alerts-section' : 'alerts-section no-alerts';
+  const title = hasAlerts ? '⚠️ Active Alerts' : '✅ All Systems Normal';
+  
+  const alertItems = alerts.map(alert => {
+    const alertClass = alert.type === 'error' ? 'alert-item' : 'alert-item ok';
+    return `<div class="${alertClass}">${alert.icon} ${alert.message}</div>`;
+  }).join('');
+  
+  return `
+    <div class="${sectionClass}">
+      <h3>${title}</h3>
+      ${alertItems}
+    </div>
   `;
 }
 
