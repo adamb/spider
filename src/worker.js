@@ -270,36 +270,76 @@ async function handleProbesPage(env) {
 }
 
 function generateProbesHTML(probes) {
-  const probeRows = probes.map(probe => {
-    const lastTime = new Date(probe.last * 1000).toLocaleString();
-    const probeTypeLabel = {
-      'tf': 'Temperature',
-      'rh': 'Humidity',
-      '': 'Other'
-    }[probe.probetype] || probe.probetype || 'Unknown';
-    
-    let valueString = '';
-    if (probe.value !== null && probe.value !== undefined) {
-      if (probe.probetype === 'tf') {
-        const fahrenheit = (probe.value * 9/5) + 32;
-        valueString = `${fahrenheit.toFixed(1)}°F`;
-      } else if (probe.probetype === 'rh') {
-        valueString = `${probe.value}%`;
-      } else {
-        valueString = probe.value.toString();
-      }
-    } else {
-      valueString = '—';
+  // Group probes by device ID (first part of probe ID before the first hyphen)
+  const deviceGroups = {};
+  const deviceNames = {
+    '4c7525046c96': 'Storage',
+    '44179312cc0f': 'Tanks'
+  };
+  
+  probes.forEach(probe => {
+    const deviceId = probe.id.split('-')[0];
+    if (!deviceGroups[deviceId]) {
+      deviceGroups[deviceId] = [];
     }
+    deviceGroups[deviceId].push(probe);
+  });
+  
+  // Generate HTML for each device group
+  const deviceSections = Object.entries(deviceGroups).map(([deviceId, deviceProbes]) => {
+    const deviceName = deviceNames[deviceId] || deviceId;
+    
+    const probeRows = deviceProbes.map(probe => {
+      const lastTime = new Date(probe.last * 1000).toLocaleString();
+      const probeTypeLabel = {
+        'tf': 'Temperature',
+        'rh': 'Humidity',
+        '': 'Other'
+      }[probe.probetype] || probe.probetype || 'Unknown';
+      
+      let valueString = '';
+      if (probe.value !== null && probe.value !== undefined) {
+        if (probe.probetype === 'tf') {
+          const fahrenheit = (probe.value * 9/5) + 32;
+          valueString = `${fahrenheit.toFixed(1)}°F`;
+        } else if (probe.probetype === 'rh') {
+          valueString = `${probe.value}%`;
+        } else {
+          valueString = probe.value.toString();
+        }
+      } else {
+        valueString = '—';
+      }
+      
+      return `
+        <tr>
+          <td>${probe.name || probe.id}</td>
+          <td><code>${probe.id}</code></td>
+          <td>${probeTypeLabel}</td>
+          <td>${valueString}</td>
+          <td>${lastTime}</td>
+        </tr>
+      `;
+    }).join('');
     
     return `
-      <tr>
-        <td>${probe.name || probe.id}</td>
-        <td><code>${probe.id}</code></td>
-        <td>${probeTypeLabel}</td>
-        <td>${valueString}</td>
-        <td>${lastTime}</td>
-      </tr>
+      <div class="device-section">
+        <h3>${deviceName} <span class="device-id">(${deviceId})</span></h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Probe ID</th>
+              <th>Type</th>
+              <th>Value</th>
+              <th>Last Seen</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${probeRows}
+          </tbody>
+        </table>
+      </div>
     `;
   }).join('');
 
@@ -377,6 +417,19 @@ function generateProbesHTML(probes) {
         .refresh-btn:hover {
             background-color: #1565c0;
         }
+        .device-section {
+            margin-bottom: 30px;
+        }
+        .device-section h3 {
+            color: #1976d2;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        .device-id {
+            color: #666;
+            font-weight: normal;
+            font-size: 0.9em;
+        }
     </style>
 </head>
 <body>
@@ -388,20 +441,7 @@ function generateProbesHTML(probes) {
         
         <p>Total probes: <strong>${probes.length}</strong></p>
         
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Probe ID</th>
-                    <th>Type</th>
-                    <th>Value</th>
-                    <th>Last Seen</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${probeRows}
-            </tbody>
-        </table>
+        ${deviceSections}
     </div>
 </body>
 </html>
