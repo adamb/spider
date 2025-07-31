@@ -66,6 +66,16 @@ export default {
       newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
       newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       
+      // Rewrite redirect location headers to point to proxy instead of original server
+      if (newHeaders.has('location')) {
+        const location = newHeaders.get('location');
+        if (location.startsWith(TARGET_URL)) {
+          const newLocation = location.replace(TARGET_URL, `${url.protocol}//${url.host}`);
+          newHeaders.set('location', newLocation);
+          console.log(`Rewriting redirect: ${location} -> ${newLocation}`);
+        }
+      }
+      
       const newResponse = new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
