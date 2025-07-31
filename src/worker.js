@@ -4,10 +4,25 @@ const CACHE_TTL = 300; // 5 minutes
 export default {
   async fetch(request, env, ctx) {
     try {
+      // Handle CORS preflight requests
+      if (request.method === 'OPTIONS') {
+        return new Response(null, {
+          status: 200,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Access-Control-Max-Age': '86400',
+          },
+        });
+      }
+      
       const url = new URL(request.url);
       const targetUrl = new URL(url.pathname + url.search, TARGET_URL);
       
       console.log(`Proxy request: ${request.url} -> ${targetUrl.toString()}`);
+      console.log(`Request headers:`, Object.fromEntries(request.headers));
+      console.log(`User-Agent:`, request.headers.get('User-Agent'));
       
       // Create cache key
       const cacheKey = new Request(targetUrl.toString(), {
@@ -60,11 +75,14 @@ export default {
       return newResponse;
       
     } catch (error) {
+      console.error('Proxy error:', error);
       return new Response(`Proxy error: ${error.message}`, {
         status: 500,
         headers: {
           'Content-Type': 'text/plain',
           'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
       });
     }
