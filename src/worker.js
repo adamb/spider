@@ -20,9 +20,6 @@ export default {
       const url = new URL(request.url);
       const targetUrl = new URL(url.pathname + url.search, TARGET_URL);
       
-      console.log(`Proxy request: ${request.url} -> ${targetUrl.toString()}`);
-      console.log(`Request headers:`, Object.fromEntries(request.headers));
-      console.log(`User-Agent:`, request.headers.get('User-Agent'));
       
       // Create cache key
       const cacheKey = new Request(targetUrl.toString(), {
@@ -72,7 +69,6 @@ export default {
         if (location.startsWith(TARGET_URL)) {
           const newLocation = location.replace(TARGET_URL, `${url.protocol}//${url.host}`);
           newHeaders.set('location', newLocation);
-          console.log(`Rewriting redirect: ${location} -> ${newLocation}`);
         }
       }
       
@@ -85,7 +81,6 @@ export default {
       return newResponse;
       
     } catch (error) {
-      console.error('Proxy error:', error);
       return new Response(`Proxy error: ${error.message}`, {
         status: 500,
         headers: {
