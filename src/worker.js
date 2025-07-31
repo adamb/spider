@@ -225,8 +225,33 @@ async function handleProbesPage(env) {
 
     const data = await response.json();
     
+    // Fetch individual probe values
+    const probesWithValues = await Promise.all(
+      (data.probes || []).map(async (probe) => {
+        try {
+          const probeUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/probes/${probe.id}`;
+          const probeResponse = await fetch(probeUrl, {
+            method: 'GET',
+            headers: {
+              'Cookie': cookieHeader,
+              'User-Agent': 'spider-proxy/1.0',
+            },
+          });
+          
+          if (probeResponse.ok) {
+            const probeData = await probeResponse.json();
+            return { ...probe, value: probeData.value };
+          } else {
+            return { ...probe, value: null };
+          }
+        } catch (error) {
+          return { ...probe, value: null };
+        }
+      })
+    );
+    
     // Generate HTML
-    const html = generateProbesHTML(data.probes || []);
+    const html = generateProbesHTML(probesWithValues);
     
     return new Response(html, {
       status: 200,
@@ -247,21 +272,32 @@ async function handleProbesPage(env) {
 function generateProbesHTML(probes) {
   const probeRows = probes.map(probe => {
     const lastTime = new Date(probe.last * 1000).toLocaleString();
-    const status = probe.seen ? '🟢 Active' : '🔴 Inactive';
     const probeTypeLabel = {
       'tf': 'Temperature',
       'rh': 'Humidity',
       '': 'Other'
     }[probe.probetype] || probe.probetype || 'Unknown';
     
+    let valueString = '';
+    if (probe.value !== null && probe.value !== undefined) {
+      if (probe.probetype === 'tf') {
+        valueString = `${probe.value}°C`;
+      } else if (probe.probetype === 'rh') {
+        valueString = `${probe.value}%`;
+      } else {
+        valueString = probe.value.toString();
+      }
+    } else {
+      valueString = '—';
+    }
+    
     return `
       <tr>
         <td>${probe.name || probe.id}</td>
         <td><code>${probe.id}</code></td>
         <td>${probeTypeLabel}</td>
-        <td>${status}</td>
+        <td>${valueString}</td>
         <td>${lastTime}</td>
-        <td><a href="/api/probes/${probe.id}" target="_blank">Get Value</a></td>
       </tr>
     `;
   }).join('');
@@ -357,9 +393,8 @@ function generateProbesHTML(probes) {
                     <th>Name</th>
                     <th>Probe ID</th>
                     <th>Type</th>
-                    <th>Status</th>
+                    <th>Value</th>
                     <th>Last Seen</th>
-                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
