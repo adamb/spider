@@ -48,7 +48,37 @@ Returns device information including last report timestamps:
 }
 ```
 
-The `last` field contains Unix timestamps of when each device last reported data.
+#### Get Probes
+```bash
+curl https://spider.dev.pr/api/probes
+```
+
+Returns detailed sensor probe information:
+```json
+{
+  "probes": [
+    {
+      "id": "44179312cc0f-0e3890a2d556_rh",
+      "name": "Humidity",
+      "probetype": "rh",
+      "last": 1753993606,
+      "seen": false
+    },
+    {
+      "id": "4c7525046c96-101252130008001E",
+      "name": "Freezer Temp",
+      "probetype": "tf",
+      "last": 1753993639,
+      "seen": false
+    }
+  ]
+}
+```
+
+**Field Definitions:**
+- `last`: Unix timestamp of when the device/probe last reported data
+- `probetype`: Sensor type ("rh" = humidity, "tf" = temperature, "" = other)
+- `seen`: Boolean indicating if the probe is currently active/visible
 
 ## Technical Details
 
