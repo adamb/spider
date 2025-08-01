@@ -77,7 +77,7 @@ export async function getAlertStates() {
   return alertStates;
 }
 
-export function generateAlertsSection(probes, alertStates = {}, thresholds = DEFAULT_THRESHOLDS) {
+export function generateAlertsSection(probes, alertStates = {}, thresholds = DEFAULT_THRESHOLDS, devicesData = null) {
   const alerts = [];
   
   // Check freezer temperature
@@ -161,38 +161,62 @@ export function generateAlertsSection(probes, alertStates = {}, thresholds = DEF
     });
   }
   
-  // Check device offline states
-  const deviceOfflineStates = alertStates.deviceOffline || {};
+  // Check device offline states using real-time data
   const deviceNames = {
     '4c7525046c96': 'Storage',
     '44179312cc0f': 'Tanks'
   };
   
   for (const [deviceId, deviceName] of Object.entries(deviceNames)) {
-    const alertState = deviceOfflineStates[deviceId] || { active: false };
-    
     let alertType = 'ok';
     let message = `${deviceName} device: Online`;
     
-    if (alertState.active) {
-      alertType = 'error';
-      message = `${deviceName} device: Offline`;
+    // Check real-time device status if device data is available
+    if (devicesData && devicesData.devices && devicesData.devices[deviceId]) {
+      const device = devicesData.devices[deviceId];
+      const currentTime = Math.floor(Date.now() / 1000);
+      const timeSinceLastReport = currentTime - device.last;
+      const isOffline = timeSinceLastReport > thresholds.DEVICE_TIMEOUT;
       
-      if (alertState.startTime) {
-        const duration = Math.floor((Date.now() - alertState.startTime) / (1000 * 60)); // minutes
-        const hours = Math.floor(duration / 60);
-        const minutes = duration % 60;
+      if (isOffline) {
+        alertType = 'error';
+        const minutesOffline = Math.floor(timeSinceLastReport / 60);
+        const hours = Math.floor(minutesOffline / 60);
+        const remainingMinutes = minutesOffline % 60;
         
         let durationText = '';
         if (hours > 0) {
-          durationText = `${hours}h ${minutes}m`;
+          durationText = `${hours}h ${remainingMinutes}m`;
         } else {
-          durationText = `${minutes}m`;
+          durationText = `${minutesOffline}m`;
         }
         
-        message += ` 🚨 OFFLINE: ${durationText}`;
-      } else {
-        message += ' 🚨 OFFLINE';
+        message = `${deviceName} device: Offline 🚨 ${durationText} ago`;
+      }
+    } else {
+      // Fall back to cached alert state if device data not available
+      const alertState = (alertStates.deviceOffline && alertStates.deviceOffline[deviceId]) || { active: false };
+      
+      if (alertState.active) {
+        alertType = 'error';
+        message = `${deviceName} device: Offline`;
+        
+        if (alertState.startTime) {
+          const duration = Math.floor((Date.now() - alertState.startTime) / (1000 * 60)); // minutes
+          const hours = Math.floor(duration / 60);
+          const minutes = duration % 60;
+          
+          let durationText = '';
+          if (hours > 0) {
+            durationText = `${hours}h ${minutes}m`;
+          } else {
+            durationText = `${minutes}m`;
+          }
+          
+          message += ` 🚨 OFFLINE: ${durationText}`;
+        } else {
+          message += ' 🚨 OFFLINE';
+        }
       }
     }
     

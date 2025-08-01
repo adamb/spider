@@ -63,6 +63,21 @@ export async function handleProbesPage(env) {
       })
     );
     
+    // Get device data for real-time device status
+    const devicesUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/devices`;
+    const devicesResponse = await fetch(devicesUrl, {
+      method: 'GET',
+      headers: {
+        'Cookie': cookieHeader,
+        'User-Agent': 'spider-proxy/1.0',
+      },
+    });
+    
+    let devicesData = null;
+    if (devicesResponse.ok) {
+      devicesData = await devicesResponse.json();
+    }
+    
     // Get alert states from cache
     const alertStates = await getAlertStates();
     
@@ -70,7 +85,7 @@ export async function handleProbesPage(env) {
     const thresholds = await getThresholds(env);
     
     // Generate HTML
-    const html = generateProbesHTML(probesWithValues, env, alertStates, thresholds);
+    const html = generateProbesHTML(probesWithValues, env, alertStates, thresholds, devicesData);
     
     return new Response(html, {
       status: 200,
@@ -144,9 +159,9 @@ export async function handleSingleProbePage(env, probeId) {
   }
 }
 
-function generateProbesHTML(probes, env, alertStates, thresholds) {
+function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
   // Generate alerts section
-  const alertsSection = generateAlertsSection(probes, alertStates, thresholds);
+  const alertsSection = generateAlertsSection(probes, alertStates, thresholds, devicesData);
   
   // Group probes by device ID (first part of probe ID before the first hyphen)
   const deviceGroups = {};
