@@ -84,17 +84,15 @@ export function generateAlertsSection(probes, alertStates = {}, thresholds = DEF
   const freezerProbe = probes.find(p => p.id === FREEZER_PROBE_ID);
   if (freezerProbe && freezerProbe.value !== null && freezerProbe.value !== undefined) {
     const tempC = freezerProbe.value; // Raw value is in Celsius
-    const tempF = (tempC * 9/5) + 32; // Convert to Fahrenheit for display
-    const thresholdF = (thresholds.FREEZER_MAX_TEMP * 9/5) + 32; // Convert threshold to F for display
     const isOverLimit = tempC > thresholds.FREEZER_MAX_TEMP; // Compare in Celsius
     const alertState = alertStates.freezerAlert || { active: false };
     
     let alertType = 'ok';
-    let message = `Freezer temperature: ${tempC}°C (${tempF.toFixed(1)}°F, limit: ${thresholds.FREEZER_MAX_TEMP}°C/${thresholdF.toFixed(1)}°F)`;
+    let message = `Freezer temperature: ${tempC}°C (limit: ${thresholds.FREEZER_MAX_TEMP}°C)`;
     
     if (isOverLimit) {
       alertType = 'error';
-      message = `Freezer temperature: ${tempC}°C (${tempF.toFixed(1)}°F) - above ${thresholds.FREEZER_MAX_TEMP}°C limit`;
+      message = `Freezer temperature: ${tempC}°C - above ${thresholds.FREEZER_MAX_TEMP}°C limit`;
       
       if (alertState.active && alertState.startTime) {
         const duration = Math.floor((Date.now() - alertState.startTime) / (1000 * 60)); // minutes
