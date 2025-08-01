@@ -1,7 +1,7 @@
 import { TARGET_URL } from '../lib/constants.js';
 import { getThresholds } from '../lib/thresholds.js';
 import { getAlertStates, generateAlertsSection } from '../monitoring/alerts.js';
-import { getProbeTypeLabel, formatProbeValue, formatTimestamp } from '../utils/formatters.js';
+import { getProbeTypeLabel, formatProbeValue, formatTimestamp, formatTimeAgo } from '../utils/formatters.js';
 
 export async function handleProbesPage(env) {
   try {
@@ -185,7 +185,7 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
       const ageInMinutes = Math.floor((currentTime - probe.last) / 60);
       const isActive = ageInMinutes <= 15;
       const statusIcon = isActive ? '🟢' : '🔴';
-      const statusText = isActive ? 'Active' : `Inactive (${ageInMinutes}min ago)`;
+      const statusText = isActive ? 'Active' : `Inactive (${formatTimeAgo(ageInMinutes)})`;
       
       return `
         <tr>
@@ -390,7 +390,7 @@ function generateSingleProbeHTML(probeData, probeId) {
   const ageInMinutes = Math.floor((currentTime - probeData.last) / 60);
   const isActive = ageInMinutes <= 15;
   const statusIcon = isActive ? '🟢' : '🔴';
-  const statusText = isActive ? 'Active' : `Inactive (${ageInMinutes}min ago)`;
+  const statusText = isActive ? 'Active' : `Inactive (${formatTimeAgo(ageInMinutes)})`;
   
   return `
 <!DOCTYPE html>
