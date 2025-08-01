@@ -300,7 +300,16 @@ function generateProbesHTML(probes, env, alertStates) {
     const deviceName = deviceNames[deviceId] || deviceId;
     
     const probeRows = deviceProbes.map(probe => {
-      const lastTime = new Date(probe.last * 1000).toLocaleString();
+      const lastTime = new Date(probe.last * 1000).toLocaleString('en-US', {
+        timeZone: 'America/Puerto_Rico',
+        year: 'numeric',
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
       const probeTypeLabel = {
         'tf': 'Temperature',
         'rh': 'Humidity',
@@ -922,7 +931,16 @@ function generateProbeDetailsHTML(probeData, probeId) {
             </div>
             ` : ''}
             <div class="summary-item">
-                <span class="summary-label">Last Reading:</span> ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}
+                <span class="summary-label">Last Reading:</span> ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString('en-US', {
+                  timeZone: 'America/Puerto_Rico',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit', 
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: true
+                })}
             </div>
             <div class="summary-item">
                 <span class="summary-label">Status:</span> ${probeData.seen ? '🟢 Active' : '🔴 Inactive'}
