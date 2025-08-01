@@ -12,5 +12,5 @@ crons = ["*/15 * * * *"]
 
 [[kv_namespaces]]
 binding = "THRESHOLDS"
-id = "your_kv_namespace_id"
-preview_id = "your_preview_kv_namespace_id"
+id = "3ee218fe711349559755f74a1a83f81d"
+preview_id = "44815296e57e419c9b1aaaa96e9e06d0"
