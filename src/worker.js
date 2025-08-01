@@ -667,7 +667,24 @@ async function checkFreezerTemperature(env) {
     const cache = caches.default;
     const cacheKey = new Request(`https://alerts.cache/${alertKey}`);
     const cachedAlert = await cache.match(cacheKey);
-    const wasInAlertState = cachedAlert ? (await cachedAlert.text()) === 'true' : false;
+    let wasInAlertState = false;
+    let alertData = null;
+    
+    if (cachedAlert) {
+      try {
+        const cachedText = await cachedAlert.text();
+        if (cachedText === 'true') {
+          // Legacy format
+          wasInAlertState = true;
+        } else {
+          // New JSON format
+          alertData = JSON.parse(cachedText);
+          wasInAlertState = alertData.active;
+        }
+      } catch (error) {
+        wasInAlertState = false;
+      }
+    }
     
     if (isInAlertState && !wasInAlertState) {
       // New alert condition - send notification
@@ -676,8 +693,13 @@ async function checkFreezerTemperature(env) {
       await sendPushoverNotification(env, message, "🧊 Freezer Temperature Alert");
       console.log(`Sent freezer temperature alert: ${currentTemp}°F > ${FREEZER_MAX_TEMP}°F`);
       
-      // Cache the alert state
-      await cache.put(cacheKey, new Response('true'));
+      // Cache the alert state with timestamp
+      const alertData = {
+        active: true,
+        startTime: Date.now(),
+        value: currentTemp
+      };
+      await cache.put(cacheKey, new Response(JSON.stringify(alertData)));
     } else if (!isInAlertState && wasInAlertState) {
       // Alert cleared - send recovery notification
       const message = `✅ FREEZER RECOVERED: Temperature is now ${currentTemp}°F (back within safe range of ${FREEZER_MAX_TEMP}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
@@ -745,7 +767,24 @@ async function checkHumidityLevel(env) {
     const cache = caches.default;
     const cacheKey = new Request(`https://alerts.cache/${alertKey}`);
     const cachedAlert = await cache.match(cacheKey);
-    const wasInAlertState = cachedAlert ? (await cachedAlert.text()) === 'true' : false;
+    let wasInAlertState = false;
+    let alertData = null;
+    
+    if (cachedAlert) {
+      try {
+        const cachedText = await cachedAlert.text();
+        if (cachedText === 'true') {
+          // Legacy format
+          wasInAlertState = true;
+        } else {
+          // New JSON format
+          alertData = JSON.parse(cachedText);
+          wasInAlertState = alertData.active;
+        }
+      } catch (error) {
+        wasInAlertState = false;
+      }
+    }
     
     if (isInAlertState && !wasInAlertState) {
       // New alert condition - send notification
@@ -754,8 +793,13 @@ async function checkHumidityLevel(env) {
       await sendPushoverNotification(env, message, "💧 Humidity Level Alert");
       console.log(`Sent humidity alert: ${currentHumidity}% > ${HUMIDITY_MAX_LEVEL}%`);
       
-      // Cache the alert state
-      await cache.put(cacheKey, new Response('true'));
+      // Cache the alert state with timestamp
+      const alertData = {
+        active: true,
+        startTime: Date.now(),
+        value: currentHumidity
+      };
+      await cache.put(cacheKey, new Response(JSON.stringify(alertData)));
     } else if (!isInAlertState && wasInAlertState) {
       // Alert cleared - send recovery notification
       const message = `✅ HUMIDITY RECOVERED: Level is now ${currentHumidity}% (back within safe range of ${HUMIDITY_MAX_LEVEL}%)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
@@ -965,16 +1009,42 @@ async function getAlertStates() {
     // Check freezer alert state
     const freezerCacheKey = new Request('https://alerts.cache/freezer-temp-alert');
     const freezerAlert = await cache.match(freezerCacheKey);
-    alertStates.freezerAlert = freezerAlert ? (await freezerAlert.text()) === 'true' : false;
+    if (freezerAlert) {
+      try {
+        const cachedText = await freezerAlert.text();
+        if (cachedText === 'true') {
+          alertStates.freezerAlert = { active: true, startTime: null };
+        } else {
+          alertStates.freezerAlert = JSON.parse(cachedText);
+        }
+      } catch (error) {
+        alertStates.freezerAlert = { active: false };
+      }
+    } else {
+      alertStates.freezerAlert = { active: false };
+    }
     
     // Check humidity alert state
     const humidityCacheKey = new Request('https://alerts.cache/humidity-level-alert');
     const humidityAlert = await cache.match(humidityCacheKey);
-    alertStates.humidityAlert = humidityAlert ? (await humidityAlert.text()) === 'true' : false;
+    if (humidityAlert) {
+      try {
+        const cachedText = await humidityAlert.text();
+        if (cachedText === 'true') {
+          alertStates.humidityAlert = { active: true, startTime: null };
+        } else {
+          alertStates.humidityAlert = JSON.parse(cachedText);
+        }
+      } catch (error) {
+        alertStates.humidityAlert = { active: false };
+      }
+    } else {
+      alertStates.humidityAlert = { active: false };
+    }
   } catch (error) {
     console.error('Error getting alert states:', error);
-    alertStates.freezerAlert = false;
-    alertStates.humidityAlert = false;
+    alertStates.freezerAlert = { active: false };
+    alertStates.humidityAlert = { active: false };
   }
   
   return alertStates;
@@ -987,15 +1057,29 @@ function generateAlertsSection(probes, alertStates = {}) {
   const freezerProbe = probes.find(p => p.id === FREEZER_PROBE_ID);
   if (freezerProbe && freezerProbe.value !== null && freezerProbe.value !== undefined) {
     const isOverLimit = freezerProbe.value > FREEZER_MAX_TEMP;
-    const alertActive = alertStates.freezerAlert || false;
+    const alertState = alertStates.freezerAlert || { active: false };
     
     let alertType = 'ok';
-    let message = `Freezer temperature: ${freezerProbe.value}°F (within safe range)`;
+    let message = `Freezer temperature: ${freezerProbe.value}°F (limit: ${FREEZER_MAX_TEMP}°F)`;
     
     if (isOverLimit) {
       alertType = 'error';
-      message = `Freezer temperature: ${freezerProbe.value}°F (above safe limit of ${FREEZER_MAX_TEMP}°F)`;
-      if (alertActive) {
+      message = `Freezer temperature: ${freezerProbe.value}°F (above ${FREEZER_MAX_TEMP}°F limit)`;
+      
+      if (alertState.active && alertState.startTime) {
+        const duration = Math.floor((Date.now() - alertState.startTime) / (1000 * 60)); // minutes
+        const hours = Math.floor(duration / 60);
+        const minutes = duration % 60;
+        
+        let durationText = '';
+        if (hours > 0) {
+          durationText = `${hours}h ${minutes}m`;
+        } else {
+          durationText = `${minutes}m`;
+        }
+        
+        message += ` 🚨 ALERT: ${durationText}`;
+      } else if (alertState.active) {
         message += ' 🚨 ALERT SENT';
       }
     }
@@ -1012,15 +1096,29 @@ function generateAlertsSection(probes, alertStates = {}) {
   const humidityProbe = probes.find(p => p.id === HUMIDITY_PROBE_ID);
   if (humidityProbe && humidityProbe.value !== null && humidityProbe.value !== undefined) {
     const isOverLimit = humidityProbe.value > HUMIDITY_MAX_LEVEL;
-    const alertActive = alertStates.humidityAlert || false;
+    const alertState = alertStates.humidityAlert || { active: false };
     
     let alertType = 'ok';
-    let message = `Humidity level: ${humidityProbe.value}% (within safe range)`;
+    let message = `Humidity level: ${humidityProbe.value}% (limit: ${HUMIDITY_MAX_LEVEL}%)`;
     
     if (isOverLimit) {
       alertType = 'error';
-      message = `Humidity level: ${humidityProbe.value}% (above safe limit of ${HUMIDITY_MAX_LEVEL}%)`;
-      if (alertActive) {
+      message = `Humidity level: ${humidityProbe.value}% (above ${HUMIDITY_MAX_LEVEL}% limit)`;
+      
+      if (alertState.active && alertState.startTime) {
+        const duration = Math.floor((Date.now() - alertState.startTime) / (1000 * 60)); // minutes
+        const hours = Math.floor(duration / 60);
+        const minutes = duration % 60;
+        
+        let durationText = '';
+        if (hours > 0) {
+          durationText = `${hours}h ${minutes}m`;
+        } else {
+          durationText = `${minutes}m`;
+        }
+        
+        message += ` 🚨 ALERT: ${durationText}`;
+      } else if (alertState.active) {
         message += ' 🚨 ALERT SENT';
       }
     }
