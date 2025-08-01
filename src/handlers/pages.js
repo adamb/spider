@@ -164,7 +164,13 @@ function generateProbesHTML(probes, env, alertStates, thresholds) {
     const probeRows = deviceProbes.map(probe => {
       const formattedValue = formatProbeValue(probe);
       const timestamp = formatTimestamp(probe.last);
-      const statusIcon = probe.seen ? '🟢' : '🔴';
+      
+      // Calculate age of last reading
+      const currentTime = Math.floor(Date.now() / 1000);
+      const ageInMinutes = Math.floor((currentTime - probe.last) / 60);
+      const isActive = ageInMinutes <= 15;
+      const statusIcon = isActive ? '🟢' : '🔴';
+      const statusText = isActive ? 'Active' : `Inactive (${ageInMinutes}min ago)`;
       
       return `
         <tr>
@@ -172,7 +178,7 @@ function generateProbesHTML(probes, env, alertStates, thresholds) {
           <td>${getProbeTypeLabel(probe.probetype)}</td>
           <td>${formattedValue}</td>
           <td>${timestamp}</td>
-          <td>${statusIcon} ${probe.seen ? 'Active' : 'Inactive'}</td>
+          <td>${statusIcon} ${statusText}</td>
         </tr>
       `;
     }).join('');
@@ -364,6 +370,13 @@ function generateProbesHTML(probes, env, alertStates, thresholds) {
 function generateSingleProbeHTML(probeData, probeId) {
   const formattedJson = JSON.stringify(probeData, null, 2);
   
+  // Calculate age of last reading
+  const currentTime = Math.floor(Date.now() / 1000);
+  const ageInMinutes = Math.floor((currentTime - probeData.last) / 60);
+  const isActive = ageInMinutes <= 15;
+  const statusIcon = isActive ? '🟢' : '🔴';
+  const statusText = isActive ? 'Active' : `Inactive (${ageInMinutes}min ago)`;
+  
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -480,7 +493,7 @@ function generateSingleProbeHTML(probeData, probeId) {
                 <span class="summary-label">Last Reading:</span> ${probeData.time_last || formatTimestamp(probeData.last)}
             </div>
             <div class="summary-item">
-                <span class="summary-label">Status:</span> ${probeData.seen ? '🟢 Active' : '🔴 Inactive'}
+                <span class="summary-label">Status:</span> ${statusIcon} ${statusText}
             </div>
         </div>
         
