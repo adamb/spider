@@ -13,8 +13,9 @@ export function formatProbeValue(probeData) {
   }
   
   if (probeData.probetype === 'tf') {
-    const celsius = (probeData.value - 32) * 5/9;
-    return `${probeData.value}°F (${celsius.toFixed(1)}°C)`;
+    // Raw value is in Celsius, convert to Fahrenheit for display
+    const fahrenheit = (probeData.value * 9/5) + 32;
+    return `${probeData.value}°C (${fahrenheit.toFixed(1)}°F)`;
   } else if (probeData.probetype === 'rh') {
     return `${probeData.value}%`;
   } else {

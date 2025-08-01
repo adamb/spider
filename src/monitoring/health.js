@@ -160,12 +160,14 @@ export async function checkFreezerTemperature(env, thresholds) {
       return;
     }
 
-    const currentTemp = probeData.value; // Already in Fahrenheit
-    console.log(`Freezer temperature: ${currentTemp}°F (threshold: ${thresholds.FREEZER_MAX_TEMP}°F)`);
+    const currentTempC = probeData.value; // Raw value is in Celsius
+    const currentTempF = (currentTempC * 9/5) + 32; // Convert to Fahrenheit for display
+    const thresholdF = (thresholds.FREEZER_MAX_TEMP * 9/5) + 32; // Convert threshold to F for display
+    console.log(`Freezer temperature: ${currentTempC}°C (${currentTempF.toFixed(1)}°F, threshold: ${thresholds.FREEZER_MAX_TEMP}°C/${thresholdF.toFixed(1)}°F)`);
 
-    // Check if temperature is above the safe threshold
+    // Check if temperature is above the safe threshold (both in Celsius)
     const alertKey = 'freezer-temp-alert';
-    const isInAlertState = currentTemp > thresholds.FREEZER_MAX_TEMP;
+    const isInAlertState = currentTempC > thresholds.FREEZER_MAX_TEMP;
     
     // Get cached alert state
     const cache = caches.default;
@@ -192,29 +194,29 @@ export async function checkFreezerTemperature(env, thresholds) {
     
     if (isInAlertState && !wasInAlertState) {
       // New alert condition - send notification
-      const message = `🚨 FREEZER ALERT: Temperature is ${currentTemp}°F (above safe limit of ${thresholds.FREEZER_MAX_TEMP}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
+      const message = `🚨 FREEZER ALERT: Temperature is ${currentTempC}°C (${currentTempF.toFixed(1)}°F) - above safe limit of ${thresholds.FREEZER_MAX_TEMP}°C (${thresholdF.toFixed(1)}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
       
       await sendPushoverNotification(env, message, "🧊 Freezer Temperature Alert");
-      console.log(`Sent freezer temperature alert: ${currentTemp}°F > ${thresholds.FREEZER_MAX_TEMP}°F`);
+      console.log(`Sent freezer temperature alert: ${currentTempC}°C > ${thresholds.FREEZER_MAX_TEMP}°C`);
       
       // Cache the alert state with timestamp
       const alertData = {
         active: true,
         startTime: Date.now(),
-        value: currentTemp
+        value: currentTempC
       };
       await cache.put(cacheKey, new Response(JSON.stringify(alertData)));
     } else if (!isInAlertState && wasInAlertState) {
       // Alert cleared - send recovery notification
-      const message = `✅ FREEZER RECOVERED: Temperature is now ${currentTemp}°F (back within safe range of ${thresholds.FREEZER_MAX_TEMP}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
+      const message = `✅ FREEZER RECOVERED: Temperature is now ${currentTempC}°C (${currentTempF.toFixed(1)}°F) - back within safe range of ${thresholds.FREEZER_MAX_TEMP}°C (${thresholdF.toFixed(1)}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
       
       await sendPushoverNotification(env, message, "🧊 Freezer Temperature Normal");
-      console.log(`Sent freezer recovery notification: ${currentTemp}°F <= ${thresholds.FREEZER_MAX_TEMP}°F`);
+      console.log(`Sent freezer recovery notification: ${currentTempC}°C <= ${thresholds.FREEZER_MAX_TEMP}°C`);
       
       // Clear the alert state
       await cache.delete(cacheKey);
     } else if (isInAlertState) {
-      console.log(`Freezer still in alert state: ${currentTemp}°F > ${thresholds.FREEZER_MAX_TEMP}°F (notification already sent)`);
+      console.log(`Freezer still in alert state: ${currentTempC}°C > ${thresholds.FREEZER_MAX_TEMP}°C (notification already sent)`);
     } else {
       console.log('Freezer temperature is within safe range');
     }
