@@ -186,8 +186,8 @@ Update the KV namespace IDs in `wrangler.toml` with the values returned from the
 You can adjust alert thresholds without code changes by updating KV values:
 
 ```bash
-# Set freezer temperature threshold (Fahrenheit)
-wrangler kv key put --binding=THRESHOLDS "FREEZER_MAX_TEMP" "-10" --preview false
+# Set freezer temperature threshold (Celsius)
+wrangler kv key put --binding=THRESHOLDS "FREEZER_MAX_TEMP" "-5" --preview false
 
 # Set humidity level threshold (percentage)
 wrangler kv key put --binding=THRESHOLDS "HUMIDITY_MAX_LEVEL" "55" --preview false
@@ -207,7 +207,7 @@ wrangler kv key get --binding=THRESHOLDS "FREEZER_MAX_TEMP" --preview false
 
 #### Current Configuration
 The following thresholds are currently configured in KV storage:
-- **Freezer Temperature**: -20°F
+- **Freezer Temperature**: -5°C (23°F)
 - **Humidity Level**: 55%
 - **Device Timeout**: 1800 seconds (30 minutes)
 
@@ -223,7 +223,7 @@ The following thresholds are currently configured in KV storage:
 - **Recovery notifications**: Sent when cron job detects alert conditions have cleared
 
 **Example Timeline:**
-1. Change threshold from -10°F to -20°F via KV
+1. Change threshold from -10°C to -5°C via KV
 2. Dashboard immediately shows alert (temperature now exceeds new threshold)
 3. Wait up to 15 minutes for next cron execution
 4. Cron detects new alert condition → sends Pushover → starts duration tracking
@@ -231,7 +231,7 @@ The following thresholds are currently configured in KV storage:
 
 #### Default Fallback Values
 If KV values are not available, the system uses these built-in defaults:
-- **Freezer Temperature**: -10°F
+- **Freezer Temperature**: -5°C (23°F)
 - **Humidity Level**: 55%
 - **Device Timeout**: 1800 seconds (30 minutes)
 

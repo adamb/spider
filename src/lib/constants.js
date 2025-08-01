@@ -6,7 +6,7 @@ export const HUMIDITY_PROBE_ID = '4c7525046c96-0e76b286d29e_rh';
 
 // Default threshold values (used as fallbacks)
 export const DEFAULT_THRESHOLDS = {
-  FREEZER_MAX_TEMP: -28.89, // Maximum safe freezer temperature in Celsius (equivalent to -20°F)
+  FREEZER_MAX_TEMP: -5, // Maximum safe freezer temperature in Celsius
   HUMIDITY_MAX_LEVEL: 55, // Maximum safe humidity percentage
   DEVICE_TIMEOUT: 30 * 60 // 30 minutes in seconds
 };
