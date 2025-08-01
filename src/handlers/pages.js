@@ -189,7 +189,7 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
       
       return `
         <tr>
-          <td><a href="/api/probes/${probe.id}" class="probe-link">${probe.name || 'Unnamed'}</a></td>
+          <td><a href="/probes/${probe.id}" class="probe-link">${probe.name || 'Unnamed'}</a></td>
           <td>${getProbeTypeLabel(probe.probetype)}</td>
           <td>${formattedValue}</td>
           <td>${timestamp}</td>
