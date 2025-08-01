@@ -100,6 +100,43 @@ Returns current value and details for a specific probe:
 - `time_last`: Human-readable timestamp of last reading (ISO format)
 - `value`: Current sensor reading (temperature in Celsius, humidity %, etc.)
 
+### Web Dashboard
+Visit `https://spider.dev.pr/probes` for a real-time web dashboard that displays:
+
+- **Probe Status**: All sensor probes grouped by device with current readings
+- **Alert Monitoring**: Active alerts section showing:
+  - 🧊 Freezer temperature alerts (threshold: -10°F)
+  - 💧 Humidity level alerts (threshold: 55%)
+  - 📡 Device offline alerts (timeout: 30 minutes)
+- **Duration Tracking**: Shows how long alert conditions have been active
+- **Timezone Support**: All timestamps displayed in Atlantic Standard Time (AST)
+
+## Automated Monitoring
+
+The system includes automated monitoring with Pushover notifications:
+
+### Cron Schedule
+- **Frequency**: Every 15 minutes
+- **Checks**: Device health, freezer temperature, humidity levels
+
+### Alert Types
+1. **Device Offline**: Triggered when devices haven't reported for >30 minutes
+   - `🔴 DEVICE OFFLINE: Storage (45min offline, last seen: ...)`
+   - `✅ DEVICE RECOVERED: Storage is back online`
+
+2. **Freezer Temperature**: Triggered when temperature exceeds -10°F
+   - `🚨 FREEZER ALERT: Temperature is -8°F (above safe limit of -10°F)`
+   - `✅ FREEZER RECOVERED: Temperature is now -12°F`
+
+3. **Humidity Level**: Triggered when humidity exceeds 55%
+   - `💧 HUMIDITY ALERT: Level is 58% (above safe limit of 55%)`
+   - `✅ HUMIDITY RECOVERED: Level is now 52%`
+
+### Smart Caching
+- **Alert State Tracking**: Prevents notification spam by caching alert states
+- **Duration Monitoring**: Tracks how long conditions have been in alert state
+- **Recovery Notifications**: Sends alerts when conditions return to normal
+
 ## Technical Details
 
 - **Platform**: Cloudflare Workers
@@ -107,16 +144,24 @@ Returns current value and details for a specific probe:
 - **CORS**: Enabled for all origins with standard headers
 - **Redirects**: Automatically rewritten to maintain proxy domain
 - **Authentication**: API endpoints use environment variables for secure credential storage
+- **Alert Caching**: Uses Cloudflare Cache API for persistent alert state storage
 
 ## Setup
 
 ### Environment Variables
-The API endpoints require authentication credentials stored as Cloudflare Worker secrets:
+The system requires several credentials stored as Cloudflare Worker secrets:
 
+#### API Authentication
 ```bash
 wrangler secret put THERM_PORTAL_USER
 wrangler secret put THERM_PORTAL_SESSION
 ```
 
-These are stored securely and not included in the repository.
+#### Pushover Notifications
+```bash
+wrangler secret put PUSHOVER_TOKEN
+wrangler secret put PUSHOVER_USER
+```
+
+All credentials are stored securely and not included in the repository.
 
