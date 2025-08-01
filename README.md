@@ -172,30 +172,47 @@ The system uses Cloudflare KV storage to manage configurable alert thresholds:
 #### Creating the KV Namespace
 ```bash
 # Create production KV namespace
-wrangler kv:namespace create "THRESHOLDS"
+wrangler kv namespace create "THRESHOLDS"
 
 # Create preview KV namespace for development
-wrangler kv:namespace create "THRESHOLDS" --preview
+wrangler kv namespace create "THRESHOLDS" --preview
 ```
 
 Update the KV namespace IDs in `wrangler.toml` with the values returned from the commands above.
+
+**Note**: The KV namespace has already been created and configured for this project.
 
 #### Setting Thresholds
 You can adjust alert thresholds without code changes by updating KV values:
 
 ```bash
 # Set freezer temperature threshold (Fahrenheit)
-wrangler kv:key put --binding=THRESHOLDS "FREEZER_MAX_TEMP" "-10"
+wrangler kv key put --binding=THRESHOLDS "FREEZER_MAX_TEMP" "-10" --preview false
 
 # Set humidity level threshold (percentage)
-wrangler kv:key put --binding=THRESHOLDS "HUMIDITY_MAX_LEVEL" "55"
+wrangler kv key put --binding=THRESHOLDS "HUMIDITY_MAX_LEVEL" "55" --preview false
 
 # Set device offline timeout (seconds)
-wrangler kv:key put --binding=THRESHOLDS "DEVICE_TIMEOUT" "1800"
+wrangler kv key put --binding=THRESHOLDS "DEVICE_TIMEOUT" "1800" --preview false
 ```
 
-#### Default Values
-If KV values are not set, the system uses these defaults:
+#### Viewing Current Thresholds
+```bash
+# List all threshold keys
+wrangler kv key list --binding=THRESHOLDS --preview false
+
+# Get a specific threshold value
+wrangler kv key get --binding=THRESHOLDS "FREEZER_MAX_TEMP" --preview false
+```
+
+#### Current Configuration
+The following thresholds are currently configured in KV storage:
+- **Freezer Temperature**: -10°F
+- **Humidity Level**: 55%
+- **Device Timeout**: 1800 seconds (30 minutes)
+
+#### Default Fallback Values
+If KV values are not available, the system uses these built-in defaults:
 - **Freezer Temperature**: -10°F
 - **Humidity Level**: 55%
 - **Device Timeout**: 1800 seconds (30 minutes)
