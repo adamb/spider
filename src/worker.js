@@ -2,7 +2,7 @@ const TARGET_URL = 'http://lab.spiderplant.com';
 const CACHE_TTL = 300; // 5 minutes
 const DEVICE_TIMEOUT = 30 * 60; // 30 minutes - consider device offline if no report
 const FREEZER_PROBE_ID = '4c7525046c96-101252130008001E';
-const FREEZER_MAX_TEMP = -5.56; // Maximum safe freezer temperature in Fahrenheit
+const FREEZER_MAX_TEMP = -10; // Maximum safe freezer temperature in Fahrenheit
 const HUMIDITY_PROBE_ID = '4c7525046c96-0e76b286d29e_rh';
 const HUMIDITY_MAX_LEVEL = 55; // Maximum safe humidity percentage
 
@@ -254,8 +254,11 @@ async function handleProbesPage(env) {
       })
     );
     
+    // Get alert states from cache
+    const alertStates = await getAlertStates();
+    
     // Generate HTML
-    const html = generateProbesHTML(probesWithValues, env);
+    const html = generateProbesHTML(probesWithValues, env, alertStates);
     
     return new Response(html, {
       status: 200,
@@ -273,9 +276,9 @@ async function handleProbesPage(env) {
   }
 }
 
-function generateProbesHTML(probes, env) {
+function generateProbesHTML(probes, env, alertStates) {
   // Generate alerts section
-  const alertsSection = generateAlertsSection(probes);
+  const alertsSection = generateAlertsSection(probes, alertStates);
   
   // Group probes by device ID (first part of probe ID before the first hyphen)
   const deviceGroups = {};
@@ -648,11 +651,35 @@ async function checkFreezerTemperature(env) {
     console.log(`Freezer temperature: ${currentTemp}°F (threshold: ${FREEZER_MAX_TEMP}°F)`);
 
     // Check if temperature is above the safe threshold
-    if (currentTemp > FREEZER_MAX_TEMP) {
+    const alertKey = 'freezer-temp-alert';
+    const isInAlertState = currentTemp > FREEZER_MAX_TEMP;
+    
+    // Get cached alert state
+    const cache = caches.default;
+    const cacheKey = new Request(`https://alerts.cache/${alertKey}`);
+    const cachedAlert = await cache.match(cacheKey);
+    const wasInAlertState = cachedAlert ? (await cachedAlert.text()) === 'true' : false;
+    
+    if (isInAlertState && !wasInAlertState) {
+      // New alert condition - send notification
       const message = `🚨 FREEZER ALERT: Temperature is ${currentTemp}°F (above safe limit of ${FREEZER_MAX_TEMP}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
       
       await sendPushoverNotification(env, message, "🧊 Freezer Temperature Alert");
       console.log(`Sent freezer temperature alert: ${currentTemp}°F > ${FREEZER_MAX_TEMP}°F`);
+      
+      // Cache the alert state
+      await cache.put(cacheKey, new Response('true'));
+    } else if (!isInAlertState && wasInAlertState) {
+      // Alert cleared - send recovery notification
+      const message = `✅ FREEZER RECOVERED: Temperature is now ${currentTemp}°F (back within safe range of ${FREEZER_MAX_TEMP}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
+      
+      await sendPushoverNotification(env, message, "🧊 Freezer Temperature Normal");
+      console.log(`Sent freezer recovery notification: ${currentTemp}°F <= ${FREEZER_MAX_TEMP}°F`);
+      
+      // Clear the alert state
+      await cache.delete(cacheKey);
+    } else if (isInAlertState) {
+      console.log(`Freezer still in alert state: ${currentTemp}°F > ${FREEZER_MAX_TEMP}°F (notification already sent)`);
     } else {
       console.log('Freezer temperature is within safe range');
     }
@@ -702,11 +729,35 @@ async function checkHumidityLevel(env) {
     console.log(`Humidity level: ${currentHumidity}% (threshold: ${HUMIDITY_MAX_LEVEL}%)`);
 
     // Check if humidity is above the safe threshold
-    if (currentHumidity > HUMIDITY_MAX_LEVEL) {
+    const alertKey = 'humidity-level-alert';
+    const isInAlertState = currentHumidity > HUMIDITY_MAX_LEVEL;
+    
+    // Get cached alert state
+    const cache = caches.default;
+    const cacheKey = new Request(`https://alerts.cache/${alertKey}`);
+    const cachedAlert = await cache.match(cacheKey);
+    const wasInAlertState = cachedAlert ? (await cachedAlert.text()) === 'true' : false;
+    
+    if (isInAlertState && !wasInAlertState) {
+      // New alert condition - send notification
       const message = `💧 HUMIDITY ALERT: Level is ${currentHumidity}% (above safe limit of ${HUMIDITY_MAX_LEVEL}%)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
       
       await sendPushoverNotification(env, message, "💧 Humidity Level Alert");
       console.log(`Sent humidity alert: ${currentHumidity}% > ${HUMIDITY_MAX_LEVEL}%`);
+      
+      // Cache the alert state
+      await cache.put(cacheKey, new Response('true'));
+    } else if (!isInAlertState && wasInAlertState) {
+      // Alert cleared - send recovery notification
+      const message = `✅ HUMIDITY RECOVERED: Level is now ${currentHumidity}% (back within safe range of ${HUMIDITY_MAX_LEVEL}%)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
+      
+      await sendPushoverNotification(env, message, "💧 Humidity Level Normal");
+      console.log(`Sent humidity recovery notification: ${currentHumidity}% <= ${HUMIDITY_MAX_LEVEL}%`);
+      
+      // Clear the alert state
+      await cache.delete(cacheKey);
+    } else if (isInAlertState) {
+      console.log(`Humidity still in alert state: ${currentHumidity}% > ${HUMIDITY_MAX_LEVEL}% (notification already sent)`);
     } else {
       console.log('Humidity level is within safe range');
     }
@@ -888,47 +939,80 @@ function generateProbeDetailsHTML(probeData, probeId) {
   `;
 }
 
-function generateAlertsSection(probes) {
+async function getAlertStates() {
+  const cache = caches.default;
+  const alertStates = {};
+  
+  try {
+    // Check freezer alert state
+    const freezerCacheKey = new Request('https://alerts.cache/freezer-temp-alert');
+    const freezerAlert = await cache.match(freezerCacheKey);
+    alertStates.freezerAlert = freezerAlert ? (await freezerAlert.text()) === 'true' : false;
+    
+    // Check humidity alert state
+    const humidityCacheKey = new Request('https://alerts.cache/humidity-level-alert');
+    const humidityAlert = await cache.match(humidityCacheKey);
+    alertStates.humidityAlert = humidityAlert ? (await humidityAlert.text()) === 'true' : false;
+  } catch (error) {
+    console.error('Error getting alert states:', error);
+    alertStates.freezerAlert = false;
+    alertStates.humidityAlert = false;
+  }
+  
+  return alertStates;
+}
+
+function generateAlertsSection(probes, alertStates = {}) {
   const alerts = [];
   
   // Check freezer temperature
   const freezerProbe = probes.find(p => p.id === FREEZER_PROBE_ID);
   if (freezerProbe && freezerProbe.value !== null && freezerProbe.value !== undefined) {
-    if (freezerProbe.value > FREEZER_MAX_TEMP) {
-      alerts.push({
-        type: 'error',
-        icon: '🧊',
-        message: `Freezer temperature: ${freezerProbe.value}°F (above safe limit of ${FREEZER_MAX_TEMP}°F)`,
-        probe: freezerProbe.name || 'Freezer Temp'
-      });
-    } else {
-      alerts.push({
-        type: 'ok',
-        icon: '🧊',
-        message: `Freezer temperature: ${freezerProbe.value}°F (within safe range)`,
-        probe: freezerProbe.name || 'Freezer Temp'
-      });
+    const isOverLimit = freezerProbe.value > FREEZER_MAX_TEMP;
+    const alertActive = alertStates.freezerAlert || false;
+    
+    let alertType = 'ok';
+    let message = `Freezer temperature: ${freezerProbe.value}°F (within safe range)`;
+    
+    if (isOverLimit) {
+      alertType = 'error';
+      message = `Freezer temperature: ${freezerProbe.value}°F (above safe limit of ${FREEZER_MAX_TEMP}°F)`;
+      if (alertActive) {
+        message += ' 🚨 ALERT SENT';
+      }
     }
+    
+    alerts.push({
+      type: alertType,
+      icon: '🧊',
+      message: message,
+      probe: freezerProbe.name || 'Freezer Temp'
+    });
   }
   
-  // Check humidity level
+  // Check humidity level  
   const humidityProbe = probes.find(p => p.id === HUMIDITY_PROBE_ID);
   if (humidityProbe && humidityProbe.value !== null && humidityProbe.value !== undefined) {
-    if (humidityProbe.value > HUMIDITY_MAX_LEVEL) {
-      alerts.push({
-        type: 'error',
-        icon: '💧',
-        message: `Humidity level: ${humidityProbe.value}% (above safe limit of ${HUMIDITY_MAX_LEVEL}%)`,
-        probe: humidityProbe.name || 'Built in humidity'
-      });
-    } else {
-      alerts.push({
-        type: 'ok',
-        icon: '💧',
-        message: `Humidity level: ${humidityProbe.value}% (within safe range)`,
-        probe: humidityProbe.name || 'Built in humidity'
-      });
+    const isOverLimit = humidityProbe.value > HUMIDITY_MAX_LEVEL;
+    const alertActive = alertStates.humidityAlert || false;
+    
+    let alertType = 'ok';
+    let message = `Humidity level: ${humidityProbe.value}% (within safe range)`;
+    
+    if (isOverLimit) {
+      alertType = 'error';
+      message = `Humidity level: ${humidityProbe.value}% (above safe limit of ${HUMIDITY_MAX_LEVEL}%)`;
+      if (alertActive) {
+        message += ' 🚨 ALERT SENT';
+      }
     }
+    
+    alerts.push({
+      type: alertType,
+      icon: '💧',
+      message: message,
+      probe: humidityProbe.name || 'Built in humidity'
+    });
   }
   
   const hasAlerts = alerts.some(alert => alert.type === 'error');
