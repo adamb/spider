@@ -207,9 +207,27 @@ wrangler kv key get --binding=THRESHOLDS "FREEZER_MAX_TEMP" --preview false
 
 #### Current Configuration
 The following thresholds are currently configured in KV storage:
-- **Freezer Temperature**: -10°F
+- **Freezer Temperature**: -20°F
 - **Humidity Level**: 55%
 - **Device Timeout**: 1800 seconds (30 minutes)
+
+#### How Threshold Changes Work
+
+**Immediate Effects:**
+- Dashboard alerts update instantly when you change KV thresholds
+- Alert conditions are evaluated in real-time using current KV values
+
+**Delayed Effects (Cron-based):**
+- **Pushover notifications**: Sent when cron job detects new alert conditions (every 15 minutes)
+- **Duration tracking**: Starts when cron job caches a new alert state with timestamp
+- **Recovery notifications**: Sent when cron job detects alert conditions have cleared
+
+**Example Timeline:**
+1. Change threshold from -10°F to -20°F via KV
+2. Dashboard immediately shows alert (temperature now exceeds new threshold)
+3. Wait up to 15 minutes for next cron execution
+4. Cron detects new alert condition → sends Pushover → starts duration tracking
+5. Dashboard now shows "🚨 ALERT: Xm" with elapsed time
 
 #### Default Fallback Values
 If KV values are not available, the system uses these built-in defaults:
