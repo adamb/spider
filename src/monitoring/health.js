@@ -67,9 +67,12 @@ export async function checkDeviceHealth(env) {
         let wasOffline = false;
         let alertData = null;
         
+        console.log(`Checking device ${device.name} (${deviceId}): isOffline=${isOffline}, timeSinceLastReport=${timeSinceLastReport}s`);
+        
         if (cachedAlert) {
           try {
             const cachedText = await cachedAlert.text();
+            console.log(`Found cached alert for ${device.name}: ${cachedText}`);
             if (cachedText === 'true') {
               // Legacy format
               wasOffline = true;
@@ -79,9 +82,14 @@ export async function checkDeviceHealth(env) {
               wasOffline = alertData.active;
             }
           } catch (error) {
+            console.log(`Error parsing cached alert for ${device.name}:`, error);
             wasOffline = false;
           }
+        } else {
+          console.log(`No cached alert found for ${device.name}`);
         }
+        
+        console.log(`Device ${device.name}: isOffline=${isOffline}, wasOffline=${wasOffline}`);
         
         if (isOffline && !wasOffline) {
           // Device went offline - send notification
@@ -100,6 +108,7 @@ export async function checkDeviceHealth(env) {
             deviceName: device.name
           };
           await cache.put(cacheKey, new Response(JSON.stringify(alertData)));
+          console.log(`Cached offline alert for ${device.name}:`, JSON.stringify(alertData));
         } else if (!isOffline && wasOffline) {
           // Device came back online - send recovery notification
           const message = `✅ DEVICE RECOVERED: ${device.name} is back online\n\nLast reading: ${new Date(device.last * 1000).toLocaleString()}`;
@@ -109,6 +118,10 @@ export async function checkDeviceHealth(env) {
           
           // Clear the alert state
           await cache.delete(cacheKey);
+        } else if (isOffline && wasOffline) {
+          console.log(`Device ${device.name} still offline, alert already sent`);
+        } else if (!isOffline) {
+          console.log(`Device ${device.name} is online`);
         }
       }
     }
