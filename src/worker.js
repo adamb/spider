@@ -39,8 +39,8 @@ export default {
       return await handleProbesPage(env);
     }
     
-    if (url.pathname.startsWith('/probe/')) {
-      const probeId = url.pathname.substring('/probe/'.length);
+    if (url.pathname.startsWith('/probes/')) {
+      const probeId = url.pathname.substring('/probes/'.length);
       return await handleSingleProbePage(env, probeId);
     }
 
