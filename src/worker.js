@@ -595,18 +595,65 @@ async function checkDeviceHealth(env) {
       }
     }
 
-    // Send alerts for offline devices
-    if (offlineDevices.length > 0) {
-      const deviceList = offlineDevices
-        .map(d => `${d.name} (${d.minutesOffline}min offline, last seen: ${d.lastSeen})`)
-        .join('\n');
-      
-      const message = `${offlineDevices.length} device(s) offline:\n${deviceList}`;
-      
-      await sendPushoverNotification(env, message, "Thermweb Device Alert");
-      console.log(`Sent alert for ${offlineDevices.length} offline devices`);
-    } else {
-      console.log('All devices are online');
+    // Check each device for alert state changes
+    const cache = caches.default;
+    
+    if (data.devices) {
+      for (const [deviceId, device] of Object.entries(data.devices)) {
+        const timeSinceLastReport = currentTime - device.last;
+        const isOffline = timeSinceLastReport > DEVICE_TIMEOUT;
+        
+        // Check cached alert state
+        const alertKey = `device-offline-${deviceId}`;
+        const cacheKey = new Request(`https://alerts.cache/${alertKey}`);
+        const cachedAlert = await cache.match(cacheKey);
+        let wasOffline = false;
+        let alertData = null;
+        
+        if (cachedAlert) {
+          try {
+            const cachedText = await cachedAlert.text();
+            if (cachedText === 'true') {
+              // Legacy format
+              wasOffline = true;
+            } else {
+              // New JSON format
+              alertData = JSON.parse(cachedText);
+              wasOffline = alertData.active;
+            }
+          } catch (error) {
+            wasOffline = false;
+          }
+        }
+        
+        if (isOffline && !wasOffline) {
+          // Device went offline - send notification
+          const minutesOffline = Math.floor(timeSinceLastReport / 60);
+          const lastSeen = new Date(device.last * 1000).toLocaleString();
+          const message = `🔴 DEVICE OFFLINE: ${device.name} (${minutesOffline}min offline, last seen: ${lastSeen})`;
+          
+          await sendPushoverNotification(env, message, "📡 Device Offline Alert");
+          console.log(`Sent offline alert for device: ${device.name}`);
+          
+          // Cache the alert state with timestamp
+          const alertData = {
+            active: true,
+            startTime: Date.now(),
+            deviceId: deviceId,
+            deviceName: device.name
+          };
+          await cache.put(cacheKey, new Response(JSON.stringify(alertData)));
+        } else if (!isOffline && wasOffline) {
+          // Device came back online - send recovery notification
+          const message = `✅ DEVICE RECOVERED: ${device.name} is back online\n\nLast reading: ${new Date(device.last * 1000).toLocaleString()}`;
+          
+          await sendPushoverNotification(env, message, "📡 Device Recovery");
+          console.log(`Sent recovery alert for device: ${device.name}`);
+          
+          // Clear the alert state
+          await cache.delete(cacheKey);
+        }
+      }
     }
 
     // Check freezer temperature
@@ -1041,10 +1088,38 @@ async function getAlertStates() {
     } else {
       alertStates.humidityAlert = { active: false };
     }
+    
+    // Check device offline alert states
+    alertStates.deviceOffline = {};
+    
+    // Check for known device IDs (Storage and Tanks)
+    const knownDevices = ['4c7525046c96', '44179312cc0f'];
+    
+    for (const deviceId of knownDevices) {
+      const deviceCacheKey = new Request(`https://alerts.cache/device-offline-${deviceId}`);
+      const deviceAlert = await cache.match(deviceCacheKey);
+      
+      if (deviceAlert) {
+        try {
+          const cachedText = await deviceAlert.text();
+          if (cachedText === 'true') {
+            alertStates.deviceOffline[deviceId] = { active: true, startTime: null };
+          } else {
+            alertStates.deviceOffline[deviceId] = JSON.parse(cachedText);
+          }
+        } catch (error) {
+          alertStates.deviceOffline[deviceId] = { active: false };
+        }
+      } else {
+        alertStates.deviceOffline[deviceId] = { active: false };
+      }
+    }
+    
   } catch (error) {
     console.error('Error getting alert states:', error);
     alertStates.freezerAlert = { active: false };
     alertStates.humidityAlert = { active: false };
+    alertStates.deviceOffline = {};
   }
   
   return alertStates;
@@ -1128,6 +1203,49 @@ function generateAlertsSection(probes, alertStates = {}) {
       icon: '💧',
       message: message,
       probe: humidityProbe.name || 'Built in humidity'
+    });
+  }
+  
+  // Check device offline states
+  const deviceOfflineStates = alertStates.deviceOffline || {};
+  const deviceNames = {
+    '4c7525046c96': 'Storage',
+    '44179312cc0f': 'Tanks'
+  };
+  
+  for (const [deviceId, deviceName] of Object.entries(deviceNames)) {
+    const alertState = deviceOfflineStates[deviceId] || { active: false };
+    
+    let alertType = 'ok';
+    let message = `${deviceName} device: Online`;
+    
+    if (alertState.active) {
+      alertType = 'error';
+      message = `${deviceName} device: Offline`;
+      
+      if (alertState.startTime) {
+        const duration = Math.floor((Date.now() - alertState.startTime) / (1000 * 60)); // minutes
+        const hours = Math.floor(duration / 60);
+        const minutes = duration % 60;
+        
+        let durationText = '';
+        if (hours > 0) {
+          durationText = `${hours}h ${minutes}m`;
+        } else {
+          durationText = `${minutes}m`;
+        }
+        
+        message += ` 🚨 OFFLINE: ${durationText}`;
+      } else {
+        message += ' 🚨 OFFLINE';
+      }
+    }
+    
+    alerts.push({
+      type: alertType,
+      icon: '📡',
+      message: message,
+      probe: `${deviceName} Device`
     });
   }
   
