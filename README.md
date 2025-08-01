@@ -165,3 +165,38 @@ wrangler secret put PUSHOVER_USER
 
 All credentials are stored securely and not included in the repository.
 
+### KV Storage Configuration
+
+The system uses Cloudflare KV storage to manage configurable alert thresholds:
+
+#### Creating the KV Namespace
+```bash
+# Create production KV namespace
+wrangler kv:namespace create "THRESHOLDS"
+
+# Create preview KV namespace for development
+wrangler kv:namespace create "THRESHOLDS" --preview
+```
+
+Update the KV namespace IDs in `wrangler.toml` with the values returned from the commands above.
+
+#### Setting Thresholds
+You can adjust alert thresholds without code changes by updating KV values:
+
+```bash
+# Set freezer temperature threshold (Fahrenheit)
+wrangler kv:key put --binding=THRESHOLDS "FREEZER_MAX_TEMP" "-10"
+
+# Set humidity level threshold (percentage)
+wrangler kv:key put --binding=THRESHOLDS "HUMIDITY_MAX_LEVEL" "55"
+
+# Set device offline timeout (seconds)
+wrangler kv:key put --binding=THRESHOLDS "DEVICE_TIMEOUT" "1800"
+```
+
+#### Default Values
+If KV values are not set, the system uses these defaults:
+- **Freezer Temperature**: -10°F
+- **Humidity Level**: 55%
+- **Device Timeout**: 1800 seconds (30 minutes)
+

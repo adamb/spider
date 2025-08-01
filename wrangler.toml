@@ -9,3 +9,8 @@ zone_name = "dev.pr"
 
 [triggers]
 crons = ["*/15 * * * *"]
+
+[[kv_namespaces]]
+binding = "THRESHOLDS"
+id = "your_kv_namespace_id"
+preview_id = "your_preview_kv_namespace_id"
