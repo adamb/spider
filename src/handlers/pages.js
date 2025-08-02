@@ -115,6 +115,61 @@ export async function handleAdminPage(env, request) {
         const { checkDeviceHealth } = await import('../monitoring/health.js');
         await checkDeviceHealth(env);
         console.log('Manual health check completed');
+        
+        // For debugging: show what happened instead of redirecting
+        if (url.searchParams.get('debug') === '1') {
+          const cache = caches.default;
+          
+          // Test all cache keys
+          const testKeys = [
+            'https://alerts.cache/device-offline-4c7525046c96',
+            'https://alerts.cache/device-offline-44179312cc0f',
+            'https://alerts.cache/freezer-temp-alert',
+            'https://alerts.cache/humidity-level-alert'
+          ];
+          
+          let debugInfo = 'Health check completed.\n\n';
+          debugInfo += `Environment check:\n`;
+          debugInfo += `- Has THERM_PORTAL_USER: ${!!env.THERM_PORTAL_USER}\n`;
+          debugInfo += `- Has THERM_PORTAL_SESSION: ${!!env.THERM_PORTAL_SESSION}\n\n`;
+          
+          debugInfo += `Cache results:\n`;
+          for (const key of testKeys) {
+            const cacheKey = new Request(key);
+            const cachedValue = await cache.match(cacheKey);
+            const keyName = key.replace('https://alerts.cache/', '');
+            
+            if (cachedValue) {
+              const text = await cachedValue.text();
+              debugInfo += `- ${keyName}: ${text}\n`;
+            } else {
+              debugInfo += `- ${keyName}: No cache found\n`;
+            }
+          }
+          
+          // Test writing to cache directly
+          try {
+            const testData = { test: true, timestamp: Date.now() };
+            const testCacheKey = new Request('https://alerts.cache/test-write');
+            await cache.put(testCacheKey, new Response(JSON.stringify(testData)));
+            
+            // Try to read it back
+            const readBack = await cache.match(testCacheKey);
+            if (readBack) {
+              const readText = await readBack.text();
+              debugInfo += `\nDirect cache test: SUCCESS - ${readText}`;
+            } else {
+              debugInfo += `\nDirect cache test: FAILED - could not read back`;
+            }
+          } catch (error) {
+            debugInfo += `\nDirect cache test: ERROR - ${error.message}`;
+          }
+          
+          return new Response(debugInfo, {
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        }
+        
         // Redirect back to admin page to show updated cache
         return new Response('', {
           status: 302,
