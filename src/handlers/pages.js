@@ -492,16 +492,20 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
             align-items: center;
             margin-bottom: 20px;
         }
-        .refresh-btn {
+        .refresh-btn, .fdm-btn {
             background-color: #1976d2;
             color: white;
             border: none;
             padding: 8px 16px;
+            margin-left: 10px;
             border-radius: 4px;
             cursor: pointer;
         }
-        .refresh-btn:hover {
+        .refresh-btn:hover, .fdm-btn:hover {
             background-color: #1565c0;
+        }
+        .refresh-btn {
+            margin-left: 0;
         }
         .device-section {
             margin-bottom: 30px;
@@ -567,7 +571,10 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
     <div class="container">
         <div class="header">
             <h1>Thermweb Probes</h1>
-            <button class="refresh-btn" onclick="location.reload()">Refresh</button>
+            <div>
+                <button class="refresh-btn" onclick="location.reload()">Refresh</button>
+                <button class="fdm-btn" onclick="location.href='/tw/open.html?viewname=FDM'">FDM Graph</button>
+            </div>
         </div>
         
         <p>Total probes: <strong>${probes.length}</strong></p>
