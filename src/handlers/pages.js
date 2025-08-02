@@ -104,6 +104,60 @@ export async function handleProbesPage(env) {
   }
 }
 
+export async function handleAdminPage(env) {
+  try {
+    const cache = caches.default;
+    
+    // Known alert cache keys
+    const alertCacheKeys = [
+      'https://alerts.cache/freezer-temp-alert',
+      'https://alerts.cache/humidity-level-alert',
+      'https://alerts.cache/device-offline-4c7525046c96',
+      'https://alerts.cache/device-offline-44179312cc0f'
+    ];
+    
+    // Fetch all cache values
+    const cacheData = {};
+    for (const key of alertCacheKeys) {
+      const cacheKey = new Request(key);
+      const cachedValue = await cache.match(cacheKey);
+      
+      if (cachedValue) {
+        try {
+          const text = await cachedValue.text();
+          // Try to parse as JSON, fallback to raw text
+          try {
+            cacheData[key] = JSON.parse(text);
+          } catch {
+            cacheData[key] = text;
+          }
+        } catch (error) {
+          cacheData[key] = `Error reading cache: ${error.message}`;
+        }
+      } else {
+        cacheData[key] = null;
+      }
+    }
+    
+    const html = generateAdminHTML(cacheData);
+    
+    return new Response(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html',
+      },
+    });
+
+  } catch (error) {
+    return new Response(`Admin error: ${error.message}`, {
+      status: 500,
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+    });
+  }
+}
+
 export async function handleSingleProbePage(env, probeId) {
   try {
     // Check for required environment variables
@@ -451,6 +505,158 @@ function generateSingleProbeHTML(probeData, probeId) {
   `;
 }
 
+
+function generateAdminHTML(cacheData) {
+  const cacheEntries = Object.entries(cacheData).map(([key, value]) => {
+    const keyName = key.replace('https://alerts.cache/', '');
+    let displayValue;
+    let status;
+    
+    if (value === null) {
+      displayValue = '<em>No cache entry</em>';
+      status = 'inactive';
+    } else if (typeof value === 'object') {
+      displayValue = `<pre>${JSON.stringify(value, null, 2)}</pre>`;
+      status = value.active ? 'active' : 'inactive';
+    } else {
+      displayValue = `<code>${value}</code>`;
+      status = value === 'true' ? 'active' : 'inactive';
+    }
+    
+    return `
+      <tr class="${status}">
+        <td><code>${keyName}</code></td>
+        <td>${displayValue}</td>
+        <td><span class="status-badge status-${status}">${status === 'active' ? '🔴 Active' : '🟢 Clear'}</span></td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Alert Cache Status</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background: #f8f9fa;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        h1 {
+            color: #2c5282;
+            margin: 0;
+        }
+        .nav-btn {
+            background: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        tr.active {
+            background: #fff5f5;
+        }
+        tr.inactive {
+            background: #f0fff4;
+        }
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        .status-active {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-inactive {
+            background: #d4edda;
+            color: #155724;
+        }
+        pre {
+            margin: 0;
+            font-size: 0.8em;
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+        .timestamp {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Admin - Alert Cache Status</h1>
+            <a href="/probes" class="nav-btn">← Back to Probes</a>
+        </div>
+        
+        <div class="timestamp">
+            Last updated: ${new Date().toLocaleString('en-US', { timeZone: 'America/Halifax' })} AST
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Cache Key</th>
+                    <th>Cached Value</th>
+                    <th>Alert Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${cacheEntries}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+  `;
+}
 
 function getDeviceName(deviceId) {
   const deviceNames = {
