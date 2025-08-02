@@ -184,16 +184,19 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
       const currentTime = Math.floor(Date.now() / 1000);
       const ageInMinutes = Math.floor((currentTime - probe.last) / 60);
       const isActive = ageInMinutes <= 15;
-      const statusIcon = isActive ? '🟢' : '🔴';
-      const statusText = isActive ? 'Active' : `Inactive (${formatTimeAgo(ageInMinutes)})`;
+      
+      // Format timestamp with inactive time if applicable
+      let timestampDisplay = timestamp;
+      if (!isActive) {
+        timestampDisplay += ` (${formatTimeAgo(ageInMinutes)} ago)`;
+      }
       
       return `
         <tr>
           <td><a href="/probes/${probe.id}" class="probe-link">${probe.name || 'Unnamed'}</a></td>
           <td>${getProbeTypeLabel(probe.probetype)}</td>
           <td>${formattedValue}</td>
-          <td>${timestamp}</td>
-          <td>${statusIcon} ${statusText}</td>
+          <td>${timestampDisplay}</td>
         </tr>
       `;
     }).join('');
@@ -208,7 +211,6 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
               <th>Type</th>
               <th>Current Value</th>
               <th>Last Reading</th>
-              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -383,315 +385,72 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
 }
 
 function generateSingleProbeHTML(probeData, probeId) {
-  // Calculate age of last reading
-  const currentTime = Math.floor(Date.now() / 1000);
-  const ageInMinutes = Math.floor((currentTime - probeData.last) / 60);
-  const isActive = ageInMinutes <= 15;
-  const statusIcon = isActive ? '🟢' : '🔴';
-  const statusText = isActive ? 'Active' : `Inactive (${formatTimeAgo(ageInMinutes)})`;
-  
-  // Generate detailed probe information sections
-  const detailsSection = generateProbeDetailsSection(probeData);
-  
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${probeData.name || probeId} - Probe Details</title>
+    <title>Probe ${probeId}</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f5f5f5;
-            padding: 20px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            margin: 20px;
+            background: #f5f5f5;
         }
         .container {
             max-width: 800px;
             margin: 0 auto;
-            background-color: white;
+            background: white;
+            padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 30px;
-        }
-        h1 {
-            color: #2c5282;
-            margin-bottom: 20px;
-            font-size: 2em;
-        }
-        h3 {
-            color: #495057;
-            margin-bottom: 15px;
-            font-size: 1.2em;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        h1 {
+            font-size: 1.2em;
+            color: #333;
         }
         .back-btn {
-            background-color: #6c757d;
+            background: #007bff;
             color: white;
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 4px;
             text-decoration: none;
             font-size: 0.9em;
         }
-        .back-btn:hover {
-            background-color: #5a6268;
-            text-decoration: none;
-        }
-        .probe-summary {
-            background-color: #f8f9fa;
+        pre {
+            background: #f8f9fa;
             padding: 20px;
-            border-radius: 6px;
-            margin-bottom: 30px;
-        }
-        .details-section {
-            background-color: #fff;
+            border-radius: 4px;
             border: 1px solid #e9ecef;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-        .section-header {
-            background-color: #f8f9fa;
-            padding: 15px 20px;
-            border-bottom: 1px solid #e9ecef;
-            font-weight: 600;
-            color: #495057;
-        }
-        .section-content {
-            padding: 20px;
-        }
-        .summary-item, .detail-item {
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-        }
-        .summary-label, .detail-label {
-            font-weight: 600;
-            min-width: 140px;
-            color: #495057;
-        }
-        .detail-value {
-            font-family: 'Monaco', 'Menlo', monospace;
-            background-color: #f8f9fa;
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-size: 0.9em;
-        }
-        code {
-            background-color: #e9ecef;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Monaco', 'Menlo', monospace;
-            font-size: 0.9em;
-        }
-        .value-highlight {
-            background-color: #e3f2fd;
-            padding: 8px 12px;
-            border-radius: 4px;
-            border: 1px solid #bbdefb;
-            font-size: 1.1em;
-            font-weight: 600;
-            color: #1976d2;
-        }
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.9em;
-            font-weight: 500;
-        }
-        .status-active {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .status-inactive {
-            background-color: #f8d7da;
-            color: #721c24;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.4;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>${probeData.name || probeId}</h1>
-            <a href="/probes" class="back-btn">← Back to Probes</a>
+            <h1>Probe: ${probeId}</h1>
+            <a href="/probes" class="back-btn">← Back</a>
         </div>
         
-        <div class="probe-summary">
-            <div class="summary-item">
-                <span class="summary-label">ID:</span> <code>${probeData.id}</code>
-            </div>
-            <div class="summary-item">
-                <span class="summary-label">Type:</span> ${getProbeTypeLabel(probeData.probetype)}
-            </div>
-            ${probeData.value !== null && probeData.value !== undefined ? `
-            <div class="summary-item">
-                <span class="summary-label">Current Value:</span> 
-                <span class="value-highlight">${formatProbeValue(probeData)}</span>
-            </div>
-            ` : `
-            <div class="summary-item">
-                <span class="summary-label">Current Value:</span> 
-                <span style="color: #6c757d; font-style: italic;">No reading available</span>
-            </div>
-            `}
-            <div class="summary-item">
-                <span class="summary-label">Last Reading:</span> ${probeData.time_last || formatTimestamp(probeData.last)}
-            </div>
-            <div class="summary-item">
-                <span class="summary-label">Status:</span> 
-                <span class="status-badge ${isActive ? 'status-active' : 'status-inactive'}">
-                    ${statusIcon} ${statusText}
-                </span>
-            </div>
-        </div>
-        
-        ${detailsSection}
+        <pre>${JSON.stringify(probeData, null, 2)}</pre>
     </div>
 </body>
 </html>
   `;
 }
 
-function generateProbeDetailsSection(probeData) {
-  const details = [];
-  
-  // Basic Information
-  const basicInfo = [
-    { label: 'Probe ID', value: probeData.id },
-    { label: 'Name', value: probeData.name || 'Unnamed' },
-    { label: 'Probe Type', value: probeData.probetype || 'Unknown' },
-    { label: 'Type Label', value: getProbeTypeLabel(probeData.probetype) }
-  ];
-  
-  // Current Reading
-  const readingInfo = [];
-  if (probeData.value !== null && probeData.value !== undefined) {
-    readingInfo.push({ label: 'Raw Value', value: probeData.value.toString() });
-    readingInfo.push({ label: 'Formatted Value', value: formatProbeValue(probeData) });
-    
-    // Add unit-specific details
-    if (probeData.probetype === 'tf') {
-      const fahrenheit = (probeData.value * 9/5) + 32;
-      readingInfo.push({ label: 'Celsius', value: `${probeData.value}°C` });
-      readingInfo.push({ label: 'Fahrenheit', value: `${fahrenheit.toFixed(1)}°F` });
-    } else if (probeData.probetype === 'rh') {
-      readingInfo.push({ label: 'Humidity', value: `${probeData.value}%` });
-    }
-  } else {
-    readingInfo.push({ label: 'Current Reading', value: 'No data available' });
-  }
-  
-  // Timestamp Information
-  const timestampInfo = [
-    { label: 'Last Report (Unix)', value: probeData.last ? probeData.last.toString() : 'Unknown' },
-    { label: 'Last Report (Formatted)', value: probeData.time_last || (probeData.last ? formatTimestamp(probeData.last) : 'Unknown') }
-  ];
-  
-  if (probeData.last) {
-    const currentTime = Math.floor(Date.now() / 1000);
-    const ageInSeconds = currentTime - probeData.last;
-    const ageInMinutes = Math.floor(ageInSeconds / 60);
-    
-    timestampInfo.push({ label: 'Age (Seconds)', value: ageInSeconds.toString() });
-    timestampInfo.push({ label: 'Age (Minutes)', value: ageInMinutes.toString() });
-    timestampInfo.push({ label: 'Age (Formatted)', value: formatTimeAgo(ageInMinutes) });
-  }
-  
-  // Additional Properties
-  const additionalInfo = [];
-  Object.keys(probeData).forEach(key => {
-    if (!['id', 'name', 'probetype', 'value', 'last', 'time_last'].includes(key)) {
-      let value = probeData[key];
-      if (typeof value === 'boolean') {
-        value = value.toString();
-      } else if (typeof value === 'object') {
-        value = JSON.stringify(value);
-      }
-      additionalInfo.push({ label: key, value: value.toString() });
-    }
-  });
-  
-  // Generate HTML sections
-  let html = '';
-  
-  // Basic Information Section
-  html += `
-    <div class="details-section">
-      <div class="section-header">📋 Basic Information</div>
-      <div class="section-content">
-        ${basicInfo.map(item => `
-          <div class="detail-item">
-            <span class="detail-label">${item.label}:</span>
-            <span class="detail-value">${item.value}</span>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
-  
-  // Current Reading Section
-  html += `
-    <div class="details-section">
-      <div class="section-header">📊 Current Reading</div>
-      <div class="section-content">
-        ${readingInfo.map(item => `
-          <div class="detail-item">
-            <span class="detail-label">${item.label}:</span>
-            <span class="detail-value">${item.value}</span>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
-  
-  // Timestamp Information Section
-  html += `
-    <div class="details-section">
-      <div class="section-header">⏰ Timestamp Information</div>
-      <div class="section-content">
-        ${timestampInfo.map(item => `
-          <div class="detail-item">
-            <span class="detail-label">${item.label}:</span>
-            <span class="detail-value">${item.value}</span>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
-  
-  // Additional Properties Section (if any)
-  if (additionalInfo.length > 0) {
-    html += `
-      <div class="details-section">
-        <div class="section-header">🔧 Additional Properties</div>
-        <div class="section-content">
-          ${additionalInfo.map(item => `
-            <div class="detail-item">
-              <span class="detail-label">${item.label}:</span>
-              <span class="detail-value">${item.value}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }
-  
-  return html;
-}
 
 function getDeviceName(deviceId) {
   const deviceNames = {

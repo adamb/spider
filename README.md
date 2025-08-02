@@ -235,3 +235,25 @@ If KV values are not available, the system uses these built-in defaults:
 - **Humidity Level**: 55%
 - **Device Timeout**: 1800 seconds (30 minutes)
 
+## Prerequisites
+
+### Pushover Account
+To receive monitoring alerts, you need a Pushover account:
+
+1. Sign up at [pushover.net](https://pushover.net)
+2. Create an application to get your API token
+3. Note your user key from your account dashboard
+4. Configure the `PUSHOVER_TOKEN` and `PUSHOVER_USER` environment variables (see Setup section above)
+
+Without Pushover credentials, the monitoring system will log errors but continue functioning for web dashboard and API access.
+
+## Contributing
+
+### Development Workflow
+1. Make changes to the code
+2. Test locally if possible
+3. Push to the `main` branch on GitHub
+4. Cloudflare automatically deploys changes to https://spider.dev.pr
+
+No manual deployment steps are required - the system uses GitHub integration for continuous deployment.
+

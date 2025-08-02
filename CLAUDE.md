@@ -10,15 +10,19 @@ This is an early-stage HTTPS proxy project designed to provide secure access to 
 
 ## Current State
 
-The repository is in the initial planning phase with only documentation. No source code, dependencies, or build configuration exists yet.
+The project is fully implemented and deployed. It includes:
+- HTTPS proxy functionality with caching
+- Device monitoring and alerting system
+- API endpoints for devices and probes
+- Web interface for viewing probe data
 
-## Development Setup (To Be Implemented)
+## Deployment
 
-This project will likely require:
-- **Cloudflare Workers** for deployment at https://spider.dev.pr  
-- **wrangler.toml** for Cloudflare Workers configuration
-- **package.json** for Node.js dependencies and scripts
-- **src/worker.js** or similar for the main proxy logic
+The code is automatically deployed to Cloudflare Workers via GitHub integration:
+1. Push changes to the `main` branch on GitHub
+2. Cloudflare automatically deploys the updated code to https://spider.dev.pr
+
+No manual deployment steps are required.
 
 ## Architecture Notes
 
