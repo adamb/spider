@@ -8,7 +8,7 @@ pattern = "spider.dev.pr/*"
 zone_name = "dev.pr"
 
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["*/5 * * * *"]
 
 [[kv_namespaces]]
 binding = "THRESHOLDS"
