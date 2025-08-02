@@ -1,6 +1,6 @@
 import { CACHE_TTL } from './lib/constants.js';
 import { handleDevicesAPI, handleProbesAPI, handleSingleProbeAPI } from './handlers/api.js';
-import { handleProbesPage, handleSingleProbePage, handleAdminPage } from './handlers/pages.js';
+import { handleProbesPage, handleSingleProbePage, handleAdminPage, handleDebugPage } from './handlers/pages.js';
 import { checkDeviceHealth } from './monitoring/health.js';
 
 // Main request handler
@@ -46,7 +46,12 @@ export default {
 
     // Admin page
     if (url.pathname === '/admin') {
-      return await handleAdminPage(env);
+      return await handleAdminPage(env, request);
+    }
+
+    // Debug endpoint
+    if (url.pathname === '/debug') {
+      return await handleDebugPage(env);
     }
 
     // Proxy all other requests

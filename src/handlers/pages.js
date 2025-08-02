@@ -104,21 +104,33 @@ export async function handleProbesPage(env) {
   }
 }
 
-export async function handleAdminPage(env) {
+export async function handleAdminPage(env, request) {
   try {
-    const url = new URL(env.request?.url || 'https://spider.dev.pr/admin');
+    const url = new URL(request.url);
     
     // Handle manual health check trigger
     if (url.searchParams.get('trigger') === 'health') {
-      const { checkDeviceHealth } = await import('../monitoring/health.js');
-      await checkDeviceHealth(env);
-      // Redirect back to admin page to show updated cache
-      return new Response('', {
-        status: 302,
-        headers: {
-          'Location': '/admin?triggered=1',
-        },
-      });
+      try {
+        console.log('Manual health check triggered from admin page');
+        const { checkDeviceHealth } = await import('../monitoring/health.js');
+        await checkDeviceHealth(env);
+        console.log('Manual health check completed');
+        // Redirect back to admin page to show updated cache
+        return new Response('', {
+          status: 302,
+          headers: {
+            'Location': '/admin?triggered=1',
+          },
+        });
+      } catch (error) {
+        console.error('Error in manual health check:', error);
+        return new Response(`Health check failed: ${error.message}`, {
+          status: 500,
+          headers: {
+            'Content-Type': 'text/plain',
+          },
+        });
+      }
     }
     
     const cache = caches.default;
@@ -170,6 +182,66 @@ export async function handleAdminPage(env) {
       headers: {
         'Content-Type': 'text/plain',
       },
+    });
+  }
+}
+
+export async function handleDebugPage(env) {
+  try {
+    const debugInfo = {
+      hasCredentials: {
+        user: !!env.THERM_PORTAL_USER,
+        session: !!env.THERM_PORTAL_SESSION,
+        pushoverToken: !!env.PUSHOVER_TOKEN,
+        pushoverUser: !!env.PUSHOVER_USER
+      },
+      credentialLengths: {
+        user: env.THERM_PORTAL_USER?.length || 0,
+        session: env.THERM_PORTAL_SESSION?.length || 0
+      }
+    };
+
+    // Test API call
+    if (env.THERM_PORTAL_USER && env.THERM_PORTAL_SESSION) {
+      try {
+        const { TARGET_URL } = await import('../lib/constants.js');
+        const apiUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/devices`;
+        const cookieHeader = `THERM_PORTAL_USER=${env.THERM_PORTAL_USER}; THERM_PORTAL_SESSION=${env.THERM_PORTAL_SESSION}`;
+
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Cookie': cookieHeader,
+            'User-Agent': 'spider-proxy/1.0-debug',
+          },
+        });
+
+        debugInfo.apiTest = {
+          status: response.status,
+          ok: response.ok,
+          url: apiUrl
+        };
+
+        if (response.ok) {
+          const data = await response.json();
+          debugInfo.deviceCount = Object.keys(data.devices || {}).length;
+          debugInfo.devices = data.devices;
+        } else {
+          debugInfo.apiError = await response.text();
+        }
+      } catch (error) {
+        debugInfo.apiError = error.message;
+      }
+    }
+
+    return new Response(`<pre>${JSON.stringify(debugInfo, null, 2)}</pre>`, {
+      headers: { 'Content-Type': 'text/html' }
+    });
+
+  } catch (error) {
+    return new Response(`Debug error: ${error.message}`, {
+      status: 500,
+      headers: { 'Content-Type': 'text/plain' }
     });
   }
 }
