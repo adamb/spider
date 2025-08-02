@@ -15,17 +15,9 @@ export async function handleProbesPage(env) {
       });
     }
 
-    // Get probes data
-    const apiUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/probes`;
-    const cookieHeader = `THERM_PORTAL_USER=${env.THERM_PORTAL_USER}; THERM_PORTAL_SESSION=${env.THERM_PORTAL_SESSION}`;
-
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Cookie': cookieHeader,
-        'User-Agent': 'spider-proxy/1.0',
-      },
-    });
+    // Get probes data using internal API
+    const { handleProbesAPI } = await import('./api.js');
+    const response = await handleProbesAPI(env);
 
     if (!response.ok) {
       return new Response(`API request failed with status ${response.status}`, {
@@ -38,18 +30,12 @@ export async function handleProbesPage(env) {
 
     const data = await response.json();
     
-    // Fetch individual probe values
+    // Fetch individual probe values using internal API
+    const { handleSingleProbeAPI } = await import('./api.js');
     const probesWithValues = await Promise.all(
       (data.probes || []).map(async (probe) => {
         try {
-          const probeUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/probes/${probe.id}`;
-          const probeResponse = await fetch(probeUrl, {
-            method: 'GET',
-            headers: {
-              'Cookie': cookieHeader,
-              'User-Agent': 'spider-proxy/1.0',
-            },
-          });
+          const probeResponse = await handleSingleProbeAPI(env, probe.id);
           
           if (probeResponse.ok) {
             const probeData = await probeResponse.json();
@@ -63,19 +49,17 @@ export async function handleProbesPage(env) {
       })
     );
     
-    // Get device data for real-time device status
-    const devicesUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/devices`;
-    const devicesResponse = await fetch(devicesUrl, {
-      method: 'GET',
-      headers: {
-        'Cookie': cookieHeader,
-        'User-Agent': 'spider-proxy/1.0',
-      },
-    });
-    
+    // Get device data for real-time device status using internal API
+    const { handleDevicesAPI } = await import('./api.js');
     let devicesData = null;
-    if (devicesResponse.ok) {
-      devicesData = await devicesResponse.json();
+    try {
+      const devicesResponse = await handleDevicesAPI(env);
+      
+      if (devicesResponse.ok) {
+        devicesData = await devicesResponse.json();
+      }
+    } catch (error) {
+      console.error('Failed to fetch devices data:', error);
     }
     
     // Get alert states from cache
