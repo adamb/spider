@@ -116,12 +116,26 @@ export async function checkDeviceHealth(env) {
           await sendPushoverNotification(env, message, "📡 Device Recovery");
           console.log(`Sent recovery alert for device: ${device.name}`);
           
-          // Clear the alert state
-          await cache.delete(cacheKey);
+          // Cache clear state instead of deleting
+          const clearData = {
+            active: false,
+            lastClear: Date.now(),
+            deviceId: deviceId,
+            deviceName: device.name
+          };
+          await cache.put(cacheKey, new Response(JSON.stringify(clearData)));
         } else if (isOffline && wasOffline) {
           console.log(`Device ${device.name} still offline, alert already sent`);
-        } else if (!isOffline) {
-          console.log(`Device ${device.name} is online`);
+        } else if (!isOffline && !wasOffline) {
+          // Device is online and was online - maintain clear state in cache
+          const clearData = {
+            active: false,
+            lastCheck: Date.now(),
+            deviceId: deviceId,
+            deviceName: device.name
+          };
+          await cache.put(cacheKey, new Response(JSON.stringify(clearData)));
+          console.log(`Device ${device.name} is online - cached clear state`);
         }
       }
     }
@@ -226,12 +240,24 @@ export async function checkFreezerTemperature(env, thresholds) {
       await sendPushoverNotification(env, message, "🧊 Freezer Temperature Normal");
       console.log(`Sent freezer recovery notification: ${currentTempC}°C <= ${thresholds.FREEZER_MAX_TEMP}°C`);
       
-      // Clear the alert state
-      await cache.delete(cacheKey);
+      // Cache clear state instead of deleting
+      const clearData = {
+        active: false,
+        lastClear: Date.now(),
+        value: currentTempC
+      };
+      await cache.put(cacheKey, new Response(JSON.stringify(clearData)));
     } else if (isInAlertState) {
       console.log(`Freezer still in alert state: ${currentTempC}°C > ${thresholds.FREEZER_MAX_TEMP}°C (notification already sent)`);
-    } else {
-      console.log('Freezer temperature is within safe range');
+    } else if (!isInAlertState && !wasInAlertState) {
+      // Temperature is normal and was normal - maintain clear state in cache
+      const clearData = {
+        active: false,
+        lastCheck: Date.now(),
+        value: currentTempC
+      };
+      await cache.put(cacheKey, new Response(JSON.stringify(clearData)));
+      console.log(`Freezer temperature is within safe range - cached clear state: ${currentTempC}°C`);
     }
 
   } catch (error) {
@@ -326,12 +352,24 @@ export async function checkHumidityLevel(env, thresholds) {
       await sendPushoverNotification(env, message, "💧 Humidity Level Normal");
       console.log(`Sent humidity recovery notification: ${currentHumidity}% <= ${thresholds.HUMIDITY_MAX_LEVEL}%`);
       
-      // Clear the alert state
-      await cache.delete(cacheKey);
+      // Cache clear state instead of deleting
+      const clearData = {
+        active: false,
+        lastClear: Date.now(),
+        value: currentHumidity
+      };
+      await cache.put(cacheKey, new Response(JSON.stringify(clearData)));
     } else if (isInAlertState) {
       console.log(`Humidity still in alert state: ${currentHumidity}% > ${thresholds.HUMIDITY_MAX_LEVEL}% (notification already sent)`);
-    } else {
-      console.log('Humidity level is within safe range');
+    } else if (!isInAlertState && !wasInAlertState) {
+      // Humidity is normal and was normal - maintain clear state in cache
+      const clearData = {
+        active: false,
+        lastCheck: Date.now(),
+        value: currentHumidity
+      };
+      await cache.put(cacheKey, new Response(JSON.stringify(clearData)));
+      console.log(`Humidity level is within safe range - cached clear state: ${currentHumidity}%`);
     }
 
   } catch (error) {
