@@ -106,6 +106,21 @@ export async function handleProbesPage(env) {
 
 export async function handleAdminPage(env) {
   try {
+    const url = new URL(env.request?.url || 'https://spider.dev.pr/admin');
+    
+    // Handle manual health check trigger
+    if (url.searchParams.get('trigger') === 'health') {
+      const { checkDeviceHealth } = await import('../monitoring/health.js');
+      await checkDeviceHealth(env);
+      // Redirect back to admin page to show updated cache
+      return new Response('', {
+        status: 302,
+        headers: {
+          'Location': '/admin?triggered=1',
+        },
+      });
+    }
+    
     const cache = caches.default;
     
     // Known alert cache keys
@@ -139,7 +154,8 @@ export async function handleAdminPage(env) {
       }
     }
     
-    const html = generateAdminHTML(cacheData);
+    const triggered = url.searchParams.get('triggered') === '1';
+    const html = generateAdminHTML(cacheData, triggered);
     
     return new Response(html, {
       status: 200,
@@ -506,7 +522,7 @@ function generateSingleProbeHTML(probeData, probeId) {
 }
 
 
-function generateAdminHTML(cacheData) {
+function generateAdminHTML(cacheData, triggered = false) {
   const cacheEntries = Object.entries(cacheData).map(([key, value]) => {
     const keyName = key.replace('https://alerts.cache/', '');
     let displayValue;
@@ -638,6 +654,14 @@ function generateAdminHTML(cacheData) {
         
         <div class="timestamp">
             Last updated: ${new Date().toLocaleString('en-US', { timeZone: 'America/Halifax' })} AST
+            ${triggered ? '<span style="color: #28a745; font-weight: bold;"> (Health check triggered manually)</span>' : ''}
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <a href="/admin?trigger=health" class="nav-btn" style="background: #28a745;">🔍 Trigger Health Check</a>
+            <span style="margin-left: 10px; font-size: 0.9em; color: #6c757d;">
+                Note: Cloudflare cache persists across deployments, but cron jobs may take time to populate cache data.
+            </span>
         </div>
         
         <table>
