@@ -15,16 +15,14 @@ export async function checkDeviceHealth(env) {
       return;
     }
 
-    const apiUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/devices`;
-    const cookieHeader = `THERM_PORTAL_USER=${env.THERM_PORTAL_USER}; THERM_PORTAL_SESSION=${env.THERM_PORTAL_SESSION}`;
-
-    const response = await fetch(apiUrl, {
+    // Use internal API endpoint
+    const request = new Request('https://spider.dev.pr/api/devices', {
       method: 'GET',
-      headers: {
-        'Cookie': cookieHeader,
-        'User-Agent': 'spider-proxy/1.0-cron',
-      },
     });
+    
+    // Import and call the handler directly
+    const { handleDevicesAPI } = await import('../handlers/api.js');
+    const response = await handleDevicesAPI(env);
 
     if (!response.ok) {
       console.error(`Device API request failed with status ${response.status}`);
@@ -95,7 +93,7 @@ export async function checkDeviceHealth(env) {
           // Device went offline - send notification
           const minutesOffline = Math.floor(timeSinceLastReport / 60);
           const lastSeen = new Date(device.last * 1000).toLocaleString();
-          const message = `🔴 DEVICE OFFLINE: ${device.name} (${minutesOffline}min offline, last seen: ${lastSeen})`;
+          const message = `🔴 DEVICE OFFLINE: ${device.name} (${minutesOffline}min offline, last seen: ${lastSeen})\n\nView all probes: https://spider.dev.pr/probes`;
           
           await sendPushoverNotification(env, message, "📡 Device Offline Alert");
           console.log(`Sent offline alert for device: ${device.name}`);
@@ -111,7 +109,7 @@ export async function checkDeviceHealth(env) {
           console.log(`Cached offline alert for ${device.name}:`, JSON.stringify(alertData));
         } else if (!isOffline && wasOffline) {
           // Device came back online - send recovery notification
-          const message = `✅ DEVICE RECOVERED: ${device.name} is back online\n\nLast reading: ${new Date(device.last * 1000).toLocaleString()}`;
+          const message = `✅ DEVICE RECOVERED: ${device.name} is back online\n\nLast reading: ${new Date(device.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
           
           await sendPushoverNotification(env, message, "📡 Device Recovery");
           console.log(`Sent recovery alert for device: ${device.name}`);
