@@ -45,7 +45,7 @@ export default {
     }
 
     // Proxy all other requests
-    return await handleProxyRequest(request, env);
+    return await handleProxyRequest(request, env, ctx);
   },
 
   async scheduled(event, env, ctx) {
@@ -54,7 +54,7 @@ export default {
   }
 };
 
-async function handleProxyRequest(request, env) {
+async function handleProxyRequest(request, env, ctx) {
   const url = new URL(request.url);
   const targetUrl = new URL(request.url);
   targetUrl.protocol = 'http:';
