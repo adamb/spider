@@ -1,4 +1,4 @@
-import { FREEZER_PROBE_ID, HUMIDITY_PROBE_ID, DEFAULT_THRESHOLDS } from '../lib/constants.js';
+import { FREEZER_PROBE_ID, HUMIDITY_PROBE_ID, DEPTH_PROBE_ID, DEFAULT_THRESHOLDS } from '../lib/constants.js';
 
 export async function getAlertStates() {
   const cache = caches.default;
@@ -41,6 +41,24 @@ export async function getAlertStates() {
       alertStates.humidityAlert = { active: false };
     }
     
+    // Check depth alert state
+    const depthCacheKey = new Request('https://alerts.cache/depth-level-alert');
+    const depthAlert = await cache.match(depthCacheKey);
+    if (depthAlert) {
+      try {
+        const cachedText = await depthAlert.text();
+        if (cachedText === 'true') {
+          alertStates.depthAlert = { active: true, startTime: null };
+        } else {
+          alertStates.depthAlert = JSON.parse(cachedText);
+        }
+      } catch (error) {
+        alertStates.depthAlert = { active: false };
+      }
+    } else {
+      alertStates.depthAlert = { active: false };
+    }
+    
     // Check device offline alert states
     alertStates.deviceOffline = {};
     
@@ -71,6 +89,7 @@ export async function getAlertStates() {
     console.error('Error getting alert states:', error);
     alertStates.freezerAlert = { active: false };
     alertStates.humidityAlert = { active: false };
+    alertStates.depthAlert = { active: false };
     alertStates.deviceOffline = {};
   }
   
@@ -156,6 +175,45 @@ export function generateAlertsSection(probes, alertStates = {}, thresholds = DEF
       icon: '💧',
       message: message,
       probe: humidityProbe.name || 'Built in humidity'
+    });
+  }
+  
+  // Check depth level
+  const depthProbe = probes.find(p => p.id === DEPTH_PROBE_ID);
+  if (depthProbe && depthProbe.value !== null && depthProbe.value !== undefined) {
+    const isOverLimit = depthProbe.value > thresholds.DEPTH_MAX_LEVEL;
+    const alertState = alertStates.depthAlert || { active: false };
+    
+    let alertType = 'ok';
+    let message = `Depth level: ${depthProbe.value} (limit: ${thresholds.DEPTH_MAX_LEVEL})`;
+    
+    if (isOverLimit) {
+      alertType = 'error';
+      message = `Depth level: ${depthProbe.value} (above ${thresholds.DEPTH_MAX_LEVEL} limit)`;
+      
+      if (alertState.active && alertState.startTime) {
+        const duration = Math.floor((Date.now() - alertState.startTime) / (1000 * 60)); // minutes
+        const hours = Math.floor(duration / 60);
+        const minutes = duration % 60;
+        
+        let durationText = '';
+        if (hours > 0) {
+          durationText = `${hours}h ${minutes}m`;
+        } else {
+          durationText = `${minutes}m`;
+        }
+        
+        message += ` 🚨 ALERT: ${durationText}`;
+      } else if (alertState.active) {
+        message += ' 🚨 ALERT SENT';
+      }
+    }
+    
+    alerts.push({
+      type: alertType,
+      icon: '📏',
+      message: message,
+      probe: depthProbe.name || 'Depth'
     });
   }
   

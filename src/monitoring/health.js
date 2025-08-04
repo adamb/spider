@@ -1,4 +1,4 @@
-import { TARGET_URL, FREEZER_PROBE_ID, HUMIDITY_PROBE_ID } from '../lib/constants.js';
+import { TARGET_URL, FREEZER_PROBE_ID, HUMIDITY_PROBE_ID, DEPTH_PROBE_ID } from '../lib/constants.js';
 import { getThresholds } from '../lib/thresholds.js';
 import { sendPushoverNotification } from '../utils/notifications.js';
 
@@ -144,6 +144,9 @@ export async function checkDeviceHealth(env) {
     // Check humidity level
     await checkHumidityLevel(env, thresholds);
 
+    // Check depth level
+    await checkDepthLevel(env, thresholds);
+
   } catch (error) {
     console.error('Error in device health check:', error);
     await sendPushoverNotification(env, `Device health check failed: ${error.message}`, "Thermweb Monitor Error");
@@ -219,7 +222,7 @@ export async function checkFreezerTemperature(env, thresholds) {
     
     if (isInAlertState && !wasInAlertState) {
       // New alert condition - send notification
-      const message = `🚨 FREEZER ALERT: Temperature is ${currentTempC}°C (${currentTempF.toFixed(1)}°F) - above safe limit of ${thresholds.FREEZER_MAX_TEMP}°C (${thresholdF.toFixed(1)}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
+      const message = `🚨 FREEZER ALERT: Temperature is ${currentTempC}°C (${currentTempF.toFixed(1)}°F) - above safe limit of ${thresholds.FREEZER_MAX_TEMP}°C (${thresholdF.toFixed(1)}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
       
       await sendPushoverNotification(env, message, "🧊 Freezer Temperature Alert");
       console.log(`Sent freezer temperature alert: ${currentTempC}°C > ${thresholds.FREEZER_MAX_TEMP}°C`);
@@ -233,7 +236,7 @@ export async function checkFreezerTemperature(env, thresholds) {
       await cache.put(cacheKey, new Response(JSON.stringify(alertData)));
     } else if (!isInAlertState && wasInAlertState) {
       // Alert cleared - send recovery notification
-      const message = `✅ FREEZER RECOVERED: Temperature is now ${currentTempC}°C (${currentTempF.toFixed(1)}°F) - back within safe range of ${thresholds.FREEZER_MAX_TEMP}°C (${thresholdF.toFixed(1)}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
+      const message = `✅ FREEZER RECOVERED: Temperature is now ${currentTempC}°C (${currentTempF.toFixed(1)}°F) - back within safe range of ${thresholds.FREEZER_MAX_TEMP}°C (${thresholdF.toFixed(1)}°F)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
       
       await sendPushoverNotification(env, message, "🧊 Freezer Temperature Normal");
       console.log(`Sent freezer recovery notification: ${currentTempC}°C <= ${thresholds.FREEZER_MAX_TEMP}°C`);
@@ -331,7 +334,7 @@ export async function checkHumidityLevel(env, thresholds) {
     
     if (isInAlertState && !wasInAlertState) {
       // New alert condition - send notification
-      const message = `💧 HUMIDITY ALERT: Level is ${currentHumidity}% (above safe limit of ${thresholds.HUMIDITY_MAX_LEVEL}%)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
+      const message = `💧 HUMIDITY ALERT: Level is ${currentHumidity}% (above safe limit of ${thresholds.HUMIDITY_MAX_LEVEL}%)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
       
       await sendPushoverNotification(env, message, "💧 Humidity Level Alert");
       console.log(`Sent humidity alert: ${currentHumidity}% > ${thresholds.HUMIDITY_MAX_LEVEL}%`);
@@ -345,7 +348,7 @@ export async function checkHumidityLevel(env, thresholds) {
       await cache.put(cacheKey, new Response(JSON.stringify(alertData)));
     } else if (!isInAlertState && wasInAlertState) {
       // Alert cleared - send recovery notification
-      const message = `✅ HUMIDITY RECOVERED: Level is now ${currentHumidity}% (back within safe range of ${thresholds.HUMIDITY_MAX_LEVEL}%)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}`;
+      const message = `✅ HUMIDITY RECOVERED: Level is now ${currentHumidity}% (back within safe range of ${thresholds.HUMIDITY_MAX_LEVEL}%)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
       
       await sendPushoverNotification(env, message, "💧 Humidity Level Normal");
       console.log(`Sent humidity recovery notification: ${currentHumidity}% <= ${thresholds.HUMIDITY_MAX_LEVEL}%`);
@@ -373,5 +376,117 @@ export async function checkHumidityLevel(env, thresholds) {
   } catch (error) {
     console.error('Error checking humidity level:', error);
     await sendPushoverNotification(env, `Humidity level check failed: ${error.message}`, "Thermweb Monitor Error");
+  }
+}
+
+export async function checkDepthLevel(env, thresholds) {
+  try {
+    console.log('Checking depth level...');
+    
+    // Check for required environment variables
+    if (!env.THERM_PORTAL_USER || !env.THERM_PORTAL_SESSION) {
+      console.error('Missing authentication configuration for depth check');
+      return;
+    }
+
+    // Get depth probe data
+    const apiUrl = `${TARGET_URL}/api/tw-api.cgi?path=/v1/users/${env.THERM_PORTAL_USER}/probes/${DEPTH_PROBE_ID}`;
+    const cookieHeader = `THERM_PORTAL_USER=${env.THERM_PORTAL_USER}; THERM_PORTAL_SESSION=${env.THERM_PORTAL_SESSION}`;
+
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Cookie': cookieHeader,
+        'User-Agent': 'spider-proxy/1.0-cron',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Depth probe API request failed with status ${response.status}`);
+      return;
+    }
+
+    const probeData = await response.json();
+    
+    // Check if we have a valid depth reading
+    if (probeData.value === null || probeData.value === undefined) {
+      console.log('No depth reading available');
+      return;
+    }
+
+    const currentDepth = probeData.value;
+    console.log(`Depth level: ${currentDepth} (threshold: ${thresholds.DEPTH_MAX_LEVEL})`);
+
+    // Check if depth is above the safe threshold
+    const alertKey = 'depth-level-alert';
+    const isInAlertState = currentDepth > thresholds.DEPTH_MAX_LEVEL;
+    
+    // Get cached alert state
+    const cache = caches.default;
+    const cacheKey = new Request(`https://alerts.cache/${alertKey}`);
+    const cachedAlert = await cache.match(cacheKey);
+    let wasInAlertState = false;
+    let alertData = null;
+    
+    if (cachedAlert) {
+      try {
+        const cachedText = await cachedAlert.text();
+        if (cachedText === 'true') {
+          // Legacy format
+          wasInAlertState = true;
+        } else {
+          // New JSON format
+          alertData = JSON.parse(cachedText);
+          wasInAlertState = alertData.active;
+        }
+      } catch (error) {
+        wasInAlertState = false;
+      }
+    }
+    
+    if (isInAlertState && !wasInAlertState) {
+      // New alert condition - send notification
+      const message = `📏 DEPTH ALERT: Level is ${currentDepth} (above safe limit of ${thresholds.DEPTH_MAX_LEVEL})\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
+      
+      await sendPushoverNotification(env, message, "📏 Depth Level Alert");
+      console.log(`Sent depth alert: ${currentDepth} > ${thresholds.DEPTH_MAX_LEVEL}`);
+      
+      // Cache the alert state with timestamp
+      const alertData = {
+        active: true,
+        startTime: Date.now(),
+        value: currentDepth
+      };
+      await cache.put(cacheKey, new Response(JSON.stringify(alertData)));
+    } else if (!isInAlertState && wasInAlertState) {
+      // Alert cleared - send recovery notification
+      const message = `✅ DEPTH RECOVERED: Level is now ${currentDepth} (back within safe range of ${thresholds.DEPTH_MAX_LEVEL})\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
+      
+      await sendPushoverNotification(env, message, "📏 Depth Level Normal");
+      console.log(`Sent depth recovery notification: ${currentDepth} <= ${thresholds.DEPTH_MAX_LEVEL}`);
+      
+      // Cache clear state instead of deleting
+      const clearData = {
+        active: false,
+        lastClear: Date.now(),
+        value: currentDepth
+      };
+      await cache.put(cacheKey, new Response(JSON.stringify(clearData)));
+    } else if (isInAlertState) {
+      console.log(`Depth still in alert state: ${currentDepth} > ${thresholds.DEPTH_MAX_LEVEL} (notification already sent)`);
+    } else if (!isInAlertState && !wasInAlertState) {
+      // Depth is normal and was normal - maintain clear state in cache
+      const clearData = {
+        active: false,
+        lastCheck: Date.now(),
+        value: currentDepth
+      };
+      await cache.put(cacheKey, new Response(JSON.stringify(clearData)));
+      console.log(`Depth level is within safe range - cached clear state: ${currentDepth}`);
+    }
+
+  } catch (error) {
+    console.error('Error checking depth level:', error);
+    await sendPushoverNotification(env, `Depth level check failed: ${error.message}`, "Thermweb Monitor Error");
   }
 }
