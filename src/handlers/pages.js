@@ -476,7 +476,7 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
             align-items: center;
             margin-bottom: 20px;
         }
-        .refresh-btn, .fdm-btn {
+        .refresh-btn, .fdm-btn, .fdm-tanks-btn {
             background-color: #1976d2;
             color: white;
             border: none;
@@ -485,7 +485,7 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
             border-radius: 4px;
             cursor: pointer;
         }
-        .refresh-btn:hover, .fdm-btn:hover {
+        .refresh-btn:hover, .fdm-btn:hover, .fdm-tanks-btn:hover {
             background-color: #1565c0;
         }
         .refresh-btn {
@@ -558,6 +558,7 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
             <div>
                 <button class="refresh-btn" onclick="location.reload()">Refresh</button>
                 <button class="fdm-btn" onclick="location.href='/tw/open.html?viewname=FDM'">FDM Graph</button>
+                <button class="fdm-tanks-btn" onclick="location.href='/tw/open.html?viewname=FDMTanks'">FDM Tanks</button>
             </div>
         </div>
         
