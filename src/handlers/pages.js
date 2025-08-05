@@ -372,11 +372,22 @@ function generateTankGauge(probes) {
   
   return `
     <div class="tank-gauge-section">
-      <span class="gauge-title">🛢️ Tank: <strong>${tankLevel.toFixed(1)}%</strong></span>
-      <div class="gauge-bar">
-        <div class="gauge-bar-fill" style="width: ${tankLevel}%; background-color: ${gaugeColor};"></div>
+      <div class="gauge-header">
+        <span class="gauge-title">🛢️ Tank Level: <strong>${tankLevel.toFixed(1)}%</strong></span>
+        <span class="gauge-details">Depth: ${currentDepth} • ${timestamp}</span>
       </div>
-      <span class="gauge-details">Depth: ${currentDepth}</span>
+      <div class="gauge-bar-container">
+        <div class="gauge-bar">
+          <div class="gauge-bar-fill" style="width: ${tankLevel}%; background-color: ${gaugeColor};"></div>
+        </div>
+        <div class="gauge-labels">
+          <span>0%</span>
+          <span>25%</span>
+          <span>50%</span>
+          <span>75%</span>
+          <span>100%</span>
+        </div>
+      </div>
     </div>
   `;
 }
@@ -596,34 +607,45 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
         .tank-gauge-section {
             background-color: #f8f9fa;
             border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 8px 12px;
-            margin-bottom: 15px;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .gauge-header {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 12px;
+            margin-bottom: 10px;
         }
         .gauge-title {
-            font-size: 0.9em;
+            font-size: 1.1em;
             color: #2c5282;
-            white-space: nowrap;
+        }
+        .gauge-details {
+            font-size: 0.9em;
+            color: #666;
+        }
+        .gauge-bar-container {
+            position: relative;
         }
         .gauge-bar {
-            flex: 1;
-            height: 12px;
+            width: 100%;
+            height: 20px;
             background-color: #e9ecef;
-            border-radius: 6px;
+            border-radius: 10px;
             overflow: hidden;
+            margin-bottom: 5px;
         }
         .gauge-bar-fill {
             height: 100%;
             transition: width 0.3s ease, background-color 0.3s ease;
-            border-radius: 6px;
+            border-radius: 10px;
         }
-        .gauge-details {
+        .gauge-labels {
+            display: flex;
+            justify-content: space-between;
             font-size: 0.8em;
             color: #666;
-            white-space: nowrap;
         }
     </style>
 </head>
