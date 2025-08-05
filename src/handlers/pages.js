@@ -1,4 +1,4 @@
-import { TARGET_URL } from '../lib/constants.js';
+import { TARGET_URL, DEPTH_PROBE_ID } from '../lib/constants.js';
 import { getThresholds } from '../lib/thresholds.js';
 import { getAlertStates, generateAlertsSection } from '../monitoring/alerts.js';
 import { getProbeTypeLabel, formatProbeValue, formatTimestamp, formatTimeAgo } from '../utils/formatters.js';
@@ -340,9 +340,67 @@ export async function handleSingleProbePage(env, probeId) {
   }
 }
 
+function generateTankGauge(probes) {
+  // Find the depth sensor
+  const depthProbe = probes.find(p => p.id === DEPTH_PROBE_ID);
+  
+  if (!depthProbe || depthProbe.value === null || depthProbe.value === undefined) {
+    return ''; // Don't show gauge if no depth data
+  }
+  
+  // Tank parameters: 0.1 = full, 1.52 = empty
+  const fullLevel = 0.1;
+  const emptyLevel = 1.52;
+  const currentDepth = depthProbe.value;
+  
+  // Calculate tank level percentage (0-100)
+  const tankLevel = Math.max(0, Math.min(100, 
+    ((emptyLevel - currentDepth) / (emptyLevel - fullLevel)) * 100
+  ));
+  
+  // Determine color based on level
+  let gaugeColor = '#28a745'; // Green for good levels
+  if (tankLevel < 25) {
+    gaugeColor = '#dc3545'; // Red for low levels
+  } else if (tankLevel < 50) {
+    gaugeColor = '#fd7e14'; // Orange for medium-low levels
+  } else if (tankLevel < 75) {
+    gaugeColor = '#ffc107'; // Yellow for medium levels
+  }
+  
+  const timestamp = formatTimestamp(depthProbe.last);
+  
+  return `
+    <div class="tank-gauge-section">
+      <h3>🛢️ Tank Level Monitor</h3>
+      <div class="gauge-container">
+        <div class="gauge-info">
+          <div class="gauge-label">Tank Level</div>
+          <div class="gauge-value">${tankLevel.toFixed(1)}%</div>
+          <div class="gauge-reading">Depth: ${currentDepth}</div>
+          <div class="gauge-timestamp">Last updated: ${timestamp}</div>
+        </div>
+        <div class="gauge-visual">
+          <div class="gauge-tank">
+            <div class="gauge-fill" style="height: ${tankLevel}%; background-color: ${gaugeColor};"></div>
+            <div class="gauge-markers">
+              <div class="gauge-marker" style="bottom: 75%;"><span>75%</span></div>
+              <div class="gauge-marker" style="bottom: 50%;"><span>50%</span></div>
+              <div class="gauge-marker" style="bottom: 25%;"><span>25%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
   // Generate alerts section
   const alertsSection = generateAlertsSection(probes, alertStates, thresholds, devicesData);
+  
+  // Generate tank gauge
+  const tankGauge = generateTankGauge(probes);
   
   // Group probes by device ID (first part of probe ID before the first hyphen)
   const deviceGroups = {};
@@ -549,6 +607,88 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
             border-color: #bee5eb;
             color: #0c5460;
         }
+        .tank-gauge-section {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .tank-gauge-section h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #2c5282;
+            font-size: 1.1em;
+        }
+        .gauge-container {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+        .gauge-info {
+            flex: 1;
+        }
+        .gauge-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .gauge-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2c5282;
+            margin-bottom: 5px;
+        }
+        .gauge-reading {
+            font-size: 1em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .gauge-timestamp {
+            font-size: 0.9em;
+            color: #999;
+        }
+        .gauge-visual {
+            flex: 0 0 auto;
+        }
+        .gauge-tank {
+            width: 80px;
+            height: 200px;
+            border: 3px solid #333;
+            border-radius: 0 0 10px 10px;
+            background-color: #f8f9fa;
+            position: relative;
+            overflow: hidden;
+        }
+        .gauge-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            transition: height 0.3s ease, background-color 0.3s ease;
+            border-radius: 0 0 7px 7px;
+        }
+        .gauge-markers {
+            position: absolute;
+            left: -40px;
+            top: 0;
+            bottom: 0;
+            width: 40px;
+        }
+        .gauge-marker {
+            position: absolute;
+            right: 0;
+            width: 20px;
+            height: 1px;
+            background-color: #666;
+        }
+        .gauge-marker span {
+            position: absolute;
+            right: 25px;
+            top: -8px;
+            font-size: 0.8em;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -565,6 +705,8 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
         <p>Total probes: <strong>${probes.length}</strong></p>
         
         ${alertsSection}
+        
+        ${tankGauge}
         
         ${deviceSections}
     </div>
