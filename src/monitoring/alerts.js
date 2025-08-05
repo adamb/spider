@@ -41,22 +41,39 @@ export async function getAlertStates() {
       alertStates.humidityAlert = { active: false };
     }
     
-    // Check depth alert state
-    const depthCacheKey = new Request('https://alerts.cache/depth-level-alert');
-    const depthAlert = await cache.match(depthCacheKey);
-    if (depthAlert) {
+    // Check depth alert states (empty and full)
+    const depthEmptyCacheKey = new Request('https://alerts.cache/depth-empty-alert');
+    const depthEmptyAlert = await cache.match(depthEmptyCacheKey);
+    if (depthEmptyAlert) {
       try {
-        const cachedText = await depthAlert.text();
+        const cachedText = await depthEmptyAlert.text();
         if (cachedText === 'true') {
-          alertStates.depthAlert = { active: true, startTime: null };
+          alertStates.depthEmptyAlert = { active: true, startTime: null };
         } else {
-          alertStates.depthAlert = JSON.parse(cachedText);
+          alertStates.depthEmptyAlert = JSON.parse(cachedText);
         }
       } catch (error) {
-        alertStates.depthAlert = { active: false };
+        alertStates.depthEmptyAlert = { active: false };
       }
     } else {
-      alertStates.depthAlert = { active: false };
+      alertStates.depthEmptyAlert = { active: false };
+    }
+    
+    const depthFullCacheKey = new Request('https://alerts.cache/depth-full-alert');
+    const depthFullAlert = await cache.match(depthFullCacheKey);
+    if (depthFullAlert) {
+      try {
+        const cachedText = await depthFullAlert.text();
+        if (cachedText === 'true') {
+          alertStates.depthFullAlert = { active: true, startTime: null };
+        } else {
+          alertStates.depthFullAlert = JSON.parse(cachedText);
+        }
+      } catch (error) {
+        alertStates.depthFullAlert = { active: false };
+      }
+    } else {
+      alertStates.depthFullAlert = { active: false };
     }
     
     // Check device offline alert states
@@ -89,7 +106,8 @@ export async function getAlertStates() {
     console.error('Error getting alert states:', error);
     alertStates.freezerAlert = { active: false };
     alertStates.humidityAlert = { active: false };
-    alertStates.depthAlert = { active: false };
+    alertStates.depthEmptyAlert = { active: false };
+    alertStates.depthFullAlert = { active: false };
     alertStates.deviceOffline = {};
   }
   
@@ -178,21 +196,31 @@ export function generateAlertsSection(probes, alertStates = {}, thresholds = DEF
     });
   }
   
-  // Check depth level
+  // Check depth levels (both empty and full)
   const depthProbe = probes.find(p => p.id === DEPTH_PROBE_ID);
   if (depthProbe && depthProbe.value !== null && depthProbe.value !== undefined) {
-    const isOverLimit = depthProbe.value > thresholds.DEPTH_MAX_LEVEL;
-    const alertState = alertStates.depthAlert || { active: false };
+    const currentDepth = depthProbe.value;
+    const isTooEmpty = currentDepth > thresholds.DEPTH_MAX_LEVEL;
+    const isTooFull = currentDepth < thresholds.DEPTH_MIN_LEVEL;
+    const emptyAlertState = alertStates.depthEmptyAlert || { active: false };
+    const fullAlertState = alertStates.depthFullAlert || { active: false };
+    
+    // Calculate tank percentage for display
+    const fullLevel = 0.1;
+    const emptyLevel = 1.52;
+    const tankPercent = Math.max(0, Math.min(100, 
+      ((emptyLevel - currentDepth) / (emptyLevel - fullLevel)) * 100
+    ));
     
     let alertType = 'ok';
-    let message = `Depth level: ${depthProbe.value} (limit: ${thresholds.DEPTH_MAX_LEVEL})`;
+    let message = `Tank level: ${tankPercent.toFixed(1)}% (depth: ${currentDepth})`;
     
-    if (isOverLimit) {
+    if (isTooEmpty) {
       alertType = 'error';
-      message = `Depth level: ${depthProbe.value} (above ${thresholds.DEPTH_MAX_LEVEL} limit)`;
+      message = `Tank level: ${tankPercent.toFixed(1)}% (EMPTY - depth ${currentDepth} > ${thresholds.DEPTH_MAX_LEVEL})`;
       
-      if (alertState.active && alertState.startTime) {
-        const duration = Math.floor((Date.now() - alertState.startTime) / (1000 * 60)); // minutes
+      if (emptyAlertState.active && emptyAlertState.startTime) {
+        const duration = Math.floor((Date.now() - emptyAlertState.startTime) / (1000 * 60));
         const hours = Math.floor(duration / 60);
         const minutes = duration % 60;
         
@@ -204,16 +232,36 @@ export function generateAlertsSection(probes, alertStates = {}, thresholds = DEF
         }
         
         message += ` 🚨 ALERT: ${durationText}`;
-      } else if (alertState.active) {
+      } else if (emptyAlertState.active) {
+        message += ' 🚨 ALERT SENT';
+      }
+    } else if (isTooFull) {
+      alertType = 'error';
+      message = `Tank level: ${tankPercent.toFixed(1)}% (FULL - depth ${currentDepth} < ${thresholds.DEPTH_MIN_LEVEL})`;
+      
+      if (fullAlertState.active && fullAlertState.startTime) {
+        const duration = Math.floor((Date.now() - fullAlertState.startTime) / (1000 * 60));
+        const hours = Math.floor(duration / 60);
+        const minutes = duration % 60;
+        
+        let durationText = '';
+        if (hours > 0) {
+          durationText = `${hours}h ${minutes}m`;
+        } else {
+          durationText = `${minutes}m`;
+        }
+        
+        message += ` 🚨 ALERT: ${durationText}`;
+      } else if (fullAlertState.active) {
         message += ' 🚨 ALERT SENT';
       }
     }
     
     alerts.push({
       type: alertType,
-      icon: '📏',
+      icon: '🛢️',
       message: message,
-      probe: depthProbe.name || 'Depth'
+      probe: depthProbe.name || 'Tank Level'
     });
   }
   

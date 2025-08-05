@@ -8,7 +8,8 @@ export async function getThresholds(env) {
       // Try to get values from KV, fall back to defaults if not found
       const freezerTemp = await env.THRESHOLDS.get('FREEZER_MAX_TEMP');
       const humidityLevel = await env.THRESHOLDS.get('HUMIDITY_MAX_LEVEL');
-      const depthLevel = await env.THRESHOLDS.get('DEPTH_MAX_LEVEL');
+      const depthMaxLevel = await env.THRESHOLDS.get('DEPTH_MAX_LEVEL');
+      const depthMinLevel = await env.THRESHOLDS.get('DEPTH_MIN_LEVEL');
       const deviceTimeout = await env.THRESHOLDS.get('DEVICE_TIMEOUT');
       
       if (freezerTemp !== null) {
@@ -17,8 +18,11 @@ export async function getThresholds(env) {
       if (humidityLevel !== null) {
         thresholds.HUMIDITY_MAX_LEVEL = parseFloat(humidityLevel);
       }
-      if (depthLevel !== null) {
-        thresholds.DEPTH_MAX_LEVEL = parseFloat(depthLevel);
+      if (depthMaxLevel !== null) {
+        thresholds.DEPTH_MAX_LEVEL = parseFloat(depthMaxLevel);
+      }
+      if (depthMinLevel !== null) {
+        thresholds.DEPTH_MIN_LEVEL = parseFloat(depthMinLevel);
       }
       if (deviceTimeout !== null) {
         thresholds.DEVICE_TIMEOUT = parseInt(deviceTimeout);

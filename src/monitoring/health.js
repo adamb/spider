@@ -415,78 +415,142 @@ export async function checkDepthLevel(env, thresholds) {
     }
 
     const currentDepth = probeData.value;
-    console.log(`Depth level: ${currentDepth} (threshold: ${thresholds.DEPTH_MAX_LEVEL})`);
+    
+    // Calculate tank percentage for logging
+    const fullLevel = 0.1;
+    const emptyLevel = 1.52;
+    const tankPercent = Math.max(0, Math.min(100, 
+      ((emptyLevel - currentDepth) / (emptyLevel - fullLevel)) * 100
+    ));
+    
+    console.log(`Tank level: ${tankPercent.toFixed(1)}% (depth: ${currentDepth}, empty threshold: ${thresholds.DEPTH_MAX_LEVEL}, full threshold: ${thresholds.DEPTH_MIN_LEVEL})`);
 
-    // Check if depth is above the safe threshold
-    const alertKey = 'depth-level-alert';
-    const isInAlertState = currentDepth > thresholds.DEPTH_MAX_LEVEL;
-    
-    // Get cached alert state
     const cache = caches.default;
-    const cacheKey = new Request(`https://alerts.cache/${alertKey}`);
-    const cachedAlert = await cache.match(cacheKey);
-    let wasInAlertState = false;
-    let alertData = null;
     
-    if (cachedAlert) {
+    // Check for tank too empty condition
+    const isTooEmpty = currentDepth > thresholds.DEPTH_MAX_LEVEL;
+    const emptyAlertKey = 'depth-empty-alert';
+    const emptyCacheKey = new Request(`https://alerts.cache/${emptyAlertKey}`);
+    const cachedEmptyAlert = await cache.match(emptyCacheKey);
+    let wasEmptyAlert = false;
+    
+    if (cachedEmptyAlert) {
       try {
-        const cachedText = await cachedAlert.text();
+        const cachedText = await cachedEmptyAlert.text();
         if (cachedText === 'true') {
-          // Legacy format
-          wasInAlertState = true;
+          wasEmptyAlert = true;
         } else {
-          // New JSON format
-          alertData = JSON.parse(cachedText);
-          wasInAlertState = alertData.active;
+          const alertData = JSON.parse(cachedText);
+          wasEmptyAlert = alertData.active;
         }
       } catch (error) {
-        wasInAlertState = false;
+        wasEmptyAlert = false;
       }
     }
     
-    if (isInAlertState && !wasInAlertState) {
-      // New alert condition - send notification
-      const message = `📏 DEPTH ALERT: Level is ${currentDepth} (above safe limit of ${thresholds.DEPTH_MAX_LEVEL})\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
+    if (isTooEmpty && !wasEmptyAlert) {
+      // Tank too empty - send notification
+      const message = `🛢️ TANK EMPTY ALERT: Tank level is ${tankPercent.toFixed(1)}% (depth ${currentDepth} > ${thresholds.DEPTH_MAX_LEVEL})\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
       
-      await sendPushoverNotification(env, message, "📏 Depth Level Alert");
-      console.log(`Sent depth alert: ${currentDepth} > ${thresholds.DEPTH_MAX_LEVEL}`);
+      await sendPushoverNotification(env, message, "🛢️ Tank Empty Alert");
+      console.log(`Sent tank empty alert: ${currentDepth} > ${thresholds.DEPTH_MAX_LEVEL}`);
       
-      // Cache the alert state with timestamp
       const alertData = {
         active: true,
         startTime: Date.now(),
-        value: currentDepth
+        value: currentDepth,
+        tankPercent: tankPercent
       };
-      await cache.put(cacheKey, new Response(JSON.stringify(alertData)));
-    } else if (!isInAlertState && wasInAlertState) {
-      // Alert cleared - send recovery notification
-      const message = `✅ DEPTH RECOVERED: Level is now ${currentDepth} (back within safe range of ${thresholds.DEPTH_MAX_LEVEL})\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
+      await cache.put(emptyCacheKey, new Response(JSON.stringify(alertData)));
+    } else if (!isTooEmpty && wasEmptyAlert) {
+      // Tank no longer empty - send recovery notification
+      const message = `✅ TANK LEVEL RECOVERED: Tank level is now ${tankPercent.toFixed(1)}% (depth ${currentDepth} within safe range)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
       
-      await sendPushoverNotification(env, message, "📏 Depth Level Normal");
-      console.log(`Sent depth recovery notification: ${currentDepth} <= ${thresholds.DEPTH_MAX_LEVEL}`);
+      await sendPushoverNotification(env, message, "🛢️ Tank Level Normal");
+      console.log(`Sent tank empty recovery notification: ${currentDepth} <= ${thresholds.DEPTH_MAX_LEVEL}`);
       
-      // Cache clear state instead of deleting
       const clearData = {
         active: false,
         lastClear: Date.now(),
-        value: currentDepth
+        value: currentDepth,
+        tankPercent: tankPercent
       };
-      await cache.put(cacheKey, new Response(JSON.stringify(clearData)));
-    } else if (isInAlertState) {
-      console.log(`Depth still in alert state: ${currentDepth} > ${thresholds.DEPTH_MAX_LEVEL} (notification already sent)`);
-    } else if (!isInAlertState && !wasInAlertState) {
-      // Depth is normal and was normal - maintain clear state in cache
+      await cache.put(emptyCacheKey, new Response(JSON.stringify(clearData)));
+    }
+    
+    // Check for tank too full condition
+    const isTooFull = currentDepth < thresholds.DEPTH_MIN_LEVEL;
+    const fullAlertKey = 'depth-full-alert';
+    const fullCacheKey = new Request(`https://alerts.cache/${fullAlertKey}`);
+    const cachedFullAlert = await cache.match(fullCacheKey);
+    let wasFullAlert = false;
+    
+    if (cachedFullAlert) {
+      try {
+        const cachedText = await cachedFullAlert.text();
+        if (cachedText === 'true') {
+          wasFullAlert = true;
+        } else {
+          const alertData = JSON.parse(cachedText);
+          wasFullAlert = alertData.active;
+        }
+      } catch (error) {
+        wasFullAlert = false;
+      }
+    }
+    
+    if (isTooFull && !wasFullAlert) {
+      // Tank too full - send notification
+      const message = `🛢️ TANK FULL ALERT: Tank level is ${tankPercent.toFixed(1)}% (depth ${currentDepth} < ${thresholds.DEPTH_MIN_LEVEL})\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
+      
+      await sendPushoverNotification(env, message, "🛢️ Tank Full Alert");
+      console.log(`Sent tank full alert: ${currentDepth} < ${thresholds.DEPTH_MIN_LEVEL}`);
+      
+      const alertData = {
+        active: true,
+        startTime: Date.now(),
+        value: currentDepth,
+        tankPercent: tankPercent
+      };
+      await cache.put(fullCacheKey, new Response(JSON.stringify(alertData)));
+    } else if (!isTooFull && wasFullAlert) {
+      // Tank no longer too full - send recovery notification
+      const message = `✅ TANK LEVEL RECOVERED: Tank level is now ${tankPercent.toFixed(1)}% (depth ${currentDepth} within safe range)\n\nLast reading: ${probeData.time_last || new Date(probeData.last * 1000).toLocaleString()}\n\nView all probes: https://spider.dev.pr/probes`;
+      
+      await sendPushoverNotification(env, message, "🛢️ Tank Level Normal");
+      console.log(`Sent tank full recovery notification: ${currentDepth} >= ${thresholds.DEPTH_MIN_LEVEL}`);
+      
+      const clearData = {
+        active: false,
+        lastClear: Date.now(),
+        value: currentDepth,
+        tankPercent: tankPercent
+      };
+      await cache.put(fullCacheKey, new Response(JSON.stringify(clearData)));
+    }
+    
+    // Log current status
+    if (!isTooEmpty && !isTooFull) {
+      console.log(`Tank level is within safe range: ${tankPercent.toFixed(1)}% (depth ${currentDepth})`);
+      
+      // Maintain clear states in cache for both alerts
       const clearData = {
         active: false,
         lastCheck: Date.now(),
-        value: currentDepth
+        value: currentDepth,
+        tankPercent: tankPercent
       };
-      await cache.put(cacheKey, new Response(JSON.stringify(clearData)));
-      console.log(`Depth level is within safe range - cached clear state: ${currentDepth}`);
+      
+      if (!wasEmptyAlert) {
+        await cache.put(emptyCacheKey, new Response(JSON.stringify(clearData)));
+      }
+      if (!wasFullAlert) {
+        await cache.put(fullCacheKey, new Response(JSON.stringify(clearData)));
+      }
     }
 
   } catch (error) {
     console.error('Error checking depth level:', error);
-    await sendPushoverNotification(env, `Depth level check failed: ${error.message}`, "Thermweb Monitor Error");
+    await sendPushoverNotification(env, `Tank level check failed: ${error.message}`, "Thermweb Monitor Error");
   }
 }

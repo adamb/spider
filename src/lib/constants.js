@@ -9,6 +9,7 @@ export const DEPTH_PROBE_ID = '44179312cc0f-range';
 export const DEFAULT_THRESHOLDS = {
   FREEZER_MAX_TEMP: -5, // Maximum safe freezer temperature in Celsius
   HUMIDITY_MAX_LEVEL: 55, // Maximum safe humidity percentage
-  DEPTH_MAX_LEVEL: 0.7, // Maximum safe depth level
+  DEPTH_MAX_LEVEL: 0.7, // Maximum safe depth level (tank too empty)
+  DEPTH_MIN_LEVEL: 0.171, // Minimum safe depth level (tank too full at 95%)
   DEVICE_TIMEOUT: 15 * 60 // 15 minutes in seconds
 };
