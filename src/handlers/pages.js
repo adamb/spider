@@ -372,23 +372,20 @@ function generateTankGauge(probes) {
   
   return `
     <div class="tank-gauge-section">
-      <h3>🛢️ Tank Level Monitor</h3>
-      <div class="gauge-container">
-        <div class="gauge-info">
-          <div class="gauge-label">Tank Level</div>
-          <div class="gauge-value">${tankLevel.toFixed(1)}%</div>
-          <div class="gauge-reading">Depth: ${currentDepth}</div>
-          <div class="gauge-timestamp">Last updated: ${timestamp}</div>
+      <div class="gauge-header">
+        <span class="gauge-title">🛢️ Tank Level: <strong>${tankLevel.toFixed(1)}%</strong></span>
+        <span class="gauge-details">Depth: ${currentDepth} • ${timestamp}</span>
+      </div>
+      <div class="gauge-bar-container">
+        <div class="gauge-bar">
+          <div class="gauge-bar-fill" style="width: ${tankLevel}%; background-color: ${gaugeColor};"></div>
         </div>
-        <div class="gauge-visual">
-          <div class="gauge-tank">
-            <div class="gauge-fill" style="height: ${tankLevel}%; background-color: ${gaugeColor};"></div>
-            <div class="gauge-markers">
-              <div class="gauge-marker" style="bottom: 75%;"><span>75%</span></div>
-              <div class="gauge-marker" style="bottom: 50%;"><span>50%</span></div>
-              <div class="gauge-marker" style="bottom: 25%;"><span>25%</span></div>
-            </div>
-          </div>
+        <div class="gauge-labels">
+          <span>0%</span>
+          <span>25%</span>
+          <span>50%</span>
+          <span>75%</span>
+          <span>100%</span>
         </div>
       </div>
     </div>
@@ -611,81 +608,42 @@ function generateProbesHTML(probes, env, alertStates, thresholds, devicesData) {
             background-color: #f8f9fa;
             border: 1px solid #dee2e6;
             border-radius: 6px;
-            padding: 20px;
+            padding: 15px;
             margin-bottom: 20px;
         }
-        .tank-gauge-section h3 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            color: #2c5282;
-            font-size: 1.1em;
-        }
-        .gauge-container {
+        .gauge-header {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 30px;
+            margin-bottom: 10px;
         }
-        .gauge-info {
-            flex: 1;
-        }
-        .gauge-label {
-            font-size: 0.9em;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        .gauge-value {
-            font-size: 2.5em;
-            font-weight: bold;
+        .gauge-title {
+            font-size: 1.1em;
             color: #2c5282;
-            margin-bottom: 5px;
         }
-        .gauge-reading {
-            font-size: 1em;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        .gauge-timestamp {
+        .gauge-details {
             font-size: 0.9em;
-            color: #999;
+            color: #666;
         }
-        .gauge-visual {
-            flex: 0 0 auto;
-        }
-        .gauge-tank {
-            width: 80px;
-            height: 200px;
-            border: 3px solid #333;
-            border-radius: 0 0 10px 10px;
-            background-color: #f8f9fa;
+        .gauge-bar-container {
             position: relative;
+        }
+        .gauge-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
             overflow: hidden;
+            margin-bottom: 5px;
         }
-        .gauge-fill {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            transition: height 0.3s ease, background-color 0.3s ease;
-            border-radius: 0 0 7px 7px;
+        .gauge-bar-fill {
+            height: 100%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+            border-radius: 10px;
         }
-        .gauge-markers {
-            position: absolute;
-            left: -40px;
-            top: 0;
-            bottom: 0;
-            width: 40px;
-        }
-        .gauge-marker {
-            position: absolute;
-            right: 0;
-            width: 20px;
-            height: 1px;
-            background-color: #666;
-        }
-        .gauge-marker span {
-            position: absolute;
-            right: 25px;
-            top: -8px;
+        .gauge-labels {
+            display: flex;
+            justify-content: space-between;
             font-size: 0.8em;
             color: #666;
         }
