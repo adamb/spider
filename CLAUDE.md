@@ -32,6 +32,15 @@ The proxy should:
 3. Return responses over HTTPS
 4. Optionally implement caching for performance
 
+### Important Proxy Configuration
+
+**CRITICAL**: The proxy MUST use `redirect: 'manual'` in fetch requests to prevent automatic redirect following. This is essential for:
+- `/tw` endpoint functionality (301 redirect from `/tw` to `/tw/`)
+- Proper relative path resolution for assets like `pagelib.js`
+- Browser receiving correct base URL for subsequent requests
+
+Without `redirect: 'manual'`, the browser never sees redirects and relative paths break, causing 404 errors for JavaScript files and other assets.
+
 ## Git Configuration
 
 - **Main branch**: main
