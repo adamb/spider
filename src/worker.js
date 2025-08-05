@@ -89,6 +89,7 @@ async function handleProxyRequest(request, env, ctx) {
       method: request.method,
       headers: request.headers,
       body: request.body,
+      redirect: 'manual', // Don't follow redirects automatically
     });
 
     response = await fetch(modifiedRequest);
