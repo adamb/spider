@@ -1,141 +1,35 @@
-name: Auto-fix Issues
+name: Claude Code - Fix Issues
+
 on:
   issues:
     types: [opened, labeled]
+  issue_comment:
+    types: [created]
 
 jobs:
-  fix:
+  fix-issue:
     runs-on: ubuntu-latest
-    if: contains(github.event.label.name, 'claude-fix')
+    if: |
+      (github.event_name == 'issues') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
     permissions:
       contents: write
+      issues: write
       pull-requests: write
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - uses: anthropics/claude-code-action@v1
         with:
-          fetch-depth: 0
+          anthropic_api_key: ${{ secrets.OLLAMA_API_KEY }}
+          prompt: |
+            An issue was filed: "${{ github.event.issue.title }}"
 
-      - name: Install Ollama
-        run: |
-          curl -fsSL https://ollama.com/install.sh | sh
-
-      - name: Start Ollama server
-        run: |
-          ollama serve > /tmp/ollama.log 2>&1 &
-          sleep 10
-          curl -s http://localhost:11434/api/tags
-
-      - name: Pull model
-        run: |
-          ollama pull qwen2.5:3b
-
-      - name: Generate and apply fix
-        run: |
-          cat << 'SCRIPT' > fix_issue.py
-          import os
-          import requests
-          import json
-          import subprocess
-
-          issue_title = os.environ['ISSUE_TITLE']
-          issue_body = os.environ['ISSUE_BODY'] or ''
-          issue_number = os.environ['ISSUE_NUMBER']
-
-          # Read current files
-          files = {}
-          for root, _, filenames in os.walk('.'):
-              if '.git' in root or '__pycache__' in root:
-                  continue
-              for f in filenames:
-                  if f.endswith(('.ts', '.js', '.toml', '.md', '.yml', '.yaml')):
-                      path = os.path.join(root, f)
-                      try:
-                          with open(path) as fh:
-                              files[path] = fh.read()
-                      except:
-                          pass
-
-          prompt = f"""You are fixing a GitHub issue in a Cloudflare Workers HTTPS proxy project.
-
-          ISSUE: {issue_title}
-          DESCRIPTION: {issue_body}
-
-          PROJECT CONTEXT:
-          - Cloudflare Worker deployed at https://spider.dev.pr
-          - Proxies to http://lab.spiderplant.com
-          - CRITICAL: Use redirect: 'manual' in fetch requests
-          - Files: {list(files.keys())}
-
-          CURRENT FILES:
-          {json.dumps(files, indent=2)[:15000]}
-
-          Create a fix. Respond with JSON:
-          {{
-            "commit_message": "fix: description",
-            "changes": [
-              {{"file": "src/xxx.ts", "content": "full new content"}}
-            ]
-          }}
-
-          Only include files that need changes. Keep other files unchanged.
-          """
-
-          resp = requests.post('http://localhost:11434/api/generate', json={
-              'model': 'qwen2.5:3b',
-              'prompt': prompt,
-              'stream': False,
-              'options': {'temperature': 0.2}
-          }, timeout=600)
-
-          result = resp.json().get('response', '')
-          print("Model output:", result)
-
-          # Parse and apply changes
-          try:
-              start = result.find('{')
-              end = result.rfind('}') + 1
-              fix = json.loads(result[start:end])
-
-              for change in fix.get('changes', []):
-                  path = change['file']
-                  os.makedirs(os.path.dirname(path), exist_ok=True)
-                  with open(path, 'w') as f:
-                      f.write(change['content'])
-                  print(f"Updated: {path}")
-
-              commit_msg = fix.get('commit_message', f'Fix: {issue_title}')
-              subprocess.run(['git', 'config', 'user.name', 'Claude Bot'], check=True)
-              subprocess.run(['git', 'config', 'user.email', 'claude-bot@users.noreply.github.com'], check=True)
-              subprocess.run(['git', 'add', '-A'], check=True)
-              subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
-              subprocess.run(['git', 'push', '-u', 'origin', f'auto-fix/issue-{issue_number}'], check=True)
-
-          except Exception as e:
-              print(f"Error: {e}")
-              print("Raw output:", result)
-              raise
-          SCRIPT
-
-          python3 fix_issue.py
-        env:
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-
-      - name: Create Pull Request
-        if: always()
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: auto-fix/issue-${{ github.event.issue.number }}
-          title: "Fix: ${{ github.event.issue.title }}"
-          body: |
-            Auto-generated fix for #${{ github.event.issue.number }}
-            
-            **Issue:** ${{ github.event.issue.title }}
-            
             ${{ github.event.issue.body }}
-            
-            ---
-            *Generated by Ollama + qwen2.5:3b*
+
+            Analyze this issue, implement a fix, and open a pull request.
+          claude_args: "--model kimi-k2.5:cloud --max-turns 20"
+        env:
+          ANTHROPIC_BASE_URL: https://ollama.com/api
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.OLLAMA_API_KEY }}
