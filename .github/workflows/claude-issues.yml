@@ -1,0 +1,20 @@
+name: Auto-fix Issues
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    if: contains(github.event.label.name, 'claude-fix')
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            A new issue was filed: "${{ github.event.issue.title }}"
+            
+            ${{ github.event.issue.body }}
+            
+            Analyze this issue, implement a fix, and open a PR.
+          claude_args: "--max-turns 20"
