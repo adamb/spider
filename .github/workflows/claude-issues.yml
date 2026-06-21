@@ -23,14 +23,15 @@ jobs:
       - uses: anthropics/claude-code-base-action@beta
         with:
           anthropic_api_key: ${{ secrets.OLLAMA_API_KEY }}
+          model: "kimi-k2.7-code:cloud"
+          max_turns: "20"
           prompt: |
             An issue was filed: "${{ github.event.issue.title }}"
 
             ${{ github.event.issue.body }}
 
             Analyze this issue, implement a fix, and open a pull request.
-          claude_args: "--model kimi-k2.7-code:cloud --max-turns 20"
         env:
-          ANTHROPIC_BASE_URL: https://ollama.com/api
+          ANTHROPIC_BASE_URL: https://ollama.com
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.OLLAMA_API_KEY }}
           API_TIMEOUT_MS: "3000000"
