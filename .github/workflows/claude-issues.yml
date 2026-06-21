@@ -35,3 +35,5 @@ jobs:
         env:
           ANTHROPIC_BASE_URL: https://ollama.com/api
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.OLLAMA_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+
