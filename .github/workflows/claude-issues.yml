@@ -16,25 +16,21 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-      id-token: write
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-base-action@beta
         with:
           anthropic_api_key: ${{ secrets.OLLAMA_API_KEY }}
-          show_full_output: true    
           prompt: |
             An issue was filed: "${{ github.event.issue.title }}"
 
             ${{ github.event.issue.body }}
 
             Analyze this issue, implement a fix, and open a pull request.
-          claude_args: "--model kimi-k2.7-code:cloud --max-turns 20 --context-window 256000"
+          claude_args: "--model kimi-k2.7-code:cloud --max-turns 20"
         env:
           ANTHROPIC_BASE_URL: https://ollama.com/api
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.OLLAMA_API_KEY }}
           API_TIMEOUT_MS: "3000000"
-
-
