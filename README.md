@@ -6,6 +6,8 @@ An HTTPS proxy for http://lab.spiderplant.com using Cloudflare Workers.
 
 This project provides secure HTTPS access to the HTTP-only lab.spiderplant.com website by proxying requests through a Cloudflare Worker deployed at https://spider.dev.pr.
 
+Repository issues can be handled by the Codex GitHub Action.
+
 ## How it works
 
 1. **Request Processing**: The worker receives HTTPS requests at spider.dev.pr and forwards them to the corresponding HTTP URLs at lab.spiderplant.com
@@ -256,4 +258,3 @@ Without Pushover credentials, the monitoring system will log errors but continue
 4. Cloudflare automatically deploys changes to https://spider.dev.pr
 
 No manual deployment steps are required - the system uses GitHub integration for continuous deployment.
-
