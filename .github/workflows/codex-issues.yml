@@ -25,7 +25,7 @@ jobs:
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           sandbox: danger-full-access
-          codex-args: '["--ask-for-approval", "never", "--ephemeral"]'
+          codex-args: '["--ephemeral"]'
           prompt: |
             An issue was filed: "${{ github.event.issue.title }}"
 
