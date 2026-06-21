@@ -29,6 +29,11 @@ jobs:
       - name: Pull model
         run: ollama pull qwen2.5:3b
 
+      - name: Configure git
+        run: |
+          git config --global user.email "claude-bot@spider.dev.pr"
+          git config --global user.name "Claude Bot"
+
       - name: Analyze issue and create PR
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,11 +57,11 @@ jobs:
             DIFF: <unified diff format patch>
           ")
           
-          # Extract the diff and create branch
+          # Create branch
           BRANCH_NAME="auto-fix/issue-$ISSUE_NUMBER"
           git checkout -b "$BRANCH_NAME"
           
-          # Parse response and apply changes (simplified - just create a docs file for now)
+          # Create summary file with the AI response
           echo "# Fix for Issue #$ISSUE_NUMBER: $ISSUE_TITLE" > fix-summary.md
           echo "" >> fix-summary.md
           echo "$RESPONSE" >> fix-summary.md
