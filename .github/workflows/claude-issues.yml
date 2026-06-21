@@ -25,6 +25,12 @@ jobs:
           anthropic_api_key: ${{ secrets.OLLAMA_API_KEY }}
           model: "kimi-k2.7-code:cloud"
           max_turns: "20"
+          settings: |
+            {
+            "permissions": {
+              "allow": ["Edit", "Write", "MultiEdit", "Bash"]
+              }
+            }
           prompt: |
             An issue was filed: "${{ github.event.issue.title }}"
 
