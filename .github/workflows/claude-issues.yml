@@ -37,6 +37,8 @@ jobs:
             ${{ github.event.issue.body }}
 
             Analyze this issue, implement a fix, and open a pull request.
+            In the PR description, include "Closes #${{ github.event.issue.number }}" 
+            so the issue is automatically closed when the PR is merged.
         env:
           ANTHROPIC_BASE_URL: https://ollama.com
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.OLLAMA_API_KEY }}
