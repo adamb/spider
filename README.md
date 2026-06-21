@@ -105,8 +105,9 @@ Visit `https://spider.dev.pr/probes` for a real-time web dashboard that displays
 
 - **Probe Status**: All sensor probes grouped by device with current readings
 - **Alert Monitoring**: Active alerts section showing:
-  - 🧊 Freezer temperature alerts (threshold: -10°F)
+  - 🧊 Freezer temperature alerts (threshold: -5°C / 23°F)
   - 💧 Humidity level alerts (threshold: 55%)
+  - 🛢️ Tank level alerts (empty: depth > 0.7, full: depth < 0.171)
   - 📡 Device offline alerts (timeout: 30 minutes)
 - **Duration Tracking**: Shows how long alert conditions have been active
 - **Timezone Support**: All timestamps displayed in Atlantic Standard Time (AST)
@@ -116,21 +117,46 @@ Visit `https://spider.dev.pr/probes` for a real-time web dashboard that displays
 The system includes automated monitoring with Pushover notifications:
 
 ### Cron Schedule
-- **Frequency**: Every 15 minutes
-- **Checks**: Device health, freezer temperature, humidity levels
+- **Frequency**: Every 5 minutes (`*/5 * * * *`)
+- **Checks**: Device health, freezer temperature, humidity levels, tank depth levels
 
 ### Alert Types
-1. **Device Offline**: Triggered when devices haven't reported for >30 minutes
-   - `🔴 DEVICE OFFLINE: Storage (45min offline, last seen: ...)`
-   - `✅ DEVICE RECOVERED: Storage is back online`
+Pushover notifications are sent on **state transitions** to avoid spam:
+- **Alert**: Sent the first time a monitored condition enters an unhealthy state.
+- **Recovery**: Sent when the monitored condition returns to a healthy state.
+- No repeat notifications are sent while a condition remains in the same state.
 
-2. **Freezer Temperature**: Triggered when temperature exceeds -10°F
-   - `🚨 FREEZER ALERT: Temperature is -8°F (above safe limit of -10°F)`
-   - `✅ FREEZER RECOVERED: Temperature is now -12°F`
+1. **Device Offline**: Triggered when a device hasn't reported for longer than `DEVICE_TIMEOUT` (default 30 minutes)
+   - **Alert**: `🔴 DEVICE OFFLINE: Storage (45min offline, last seen: ...)`
+   - **Recovery**: `✅ DEVICE RECOVERED: Storage is back online`
 
-3. **Humidity Level**: Triggered when humidity exceeds 55%
-   - `💧 HUMIDITY ALERT: Level is 58% (above safe limit of 55%)`
-   - `✅ HUMIDITY RECOVERED: Level is now 52%`
+2. **Freezer Temperature**: Triggered when freezer temperature rises above `FREEZER_MAX_TEMP` (default -5°C / 23°F)
+   - **Alert**: `🚨 FREEZER ALERT: Temperature is -4°C (above safe limit of -5°C)`
+   - **Recovery**: `✅ FREEZER RECOVERED: Temperature is now -6°C`
+
+3. **Humidity Level**: Triggered when humidity rises above `HUMIDITY_MAX_LEVEL` (default 55%)
+   - **Alert**: `💧 HUMIDITY ALERT: Level is 58% (above safe limit of 55%)`
+   - **Recovery**: `✅ HUMIDITY RECOVERED: Level is now 52%`
+
+4. **Tank Empty**: Triggered when the tank depth reading exceeds `DEPTH_MAX_LEVEL` (default 0.7)
+   - **Alert**: `🛢️ TANK EMPTY ALERT: Tank level is 12.5% (depth 1.0 > 0.7)`
+   - **Recovery**: `✅ TANK LEVEL RECOVERED: Tank level is now 45.0%`
+
+5. **Tank Full**: Triggered when the tank depth reading falls below `DEPTH_MIN_LEVEL` (default 0.171)
+   - **Alert**: `🛢️ TANK FULL ALERT: Tank level is 95.0% (depth 0.1 < 0.171)`
+   - **Recovery**: `✅ TANK LEVEL RECOVERED: Tank level is now 45.0%`
+
+### When Pushover Events Are Sent
+The cron job runs every 5 minutes and evaluates each monitored condition against its threshold. A Pushover notification is sent only when the condition changes state:
+
+| Previous State | Current State | Action |
+|----------------|---------------|--------|
+| Healthy | Unhealthy | Send **Alert** notification |
+| Unhealthy | Healthy | Send **Recovery** notification |
+| Unhealthy | Unhealthy | No notification (already alerted) |
+| Healthy | Healthy | No notification |
+
+This state-tracking logic uses Cloudflare Cache API to persist alert states between cron runs, preventing duplicate notifications and enabling accurate duration tracking on the dashboard.
 
 ### Smart Caching
 - **Alert State Tracking**: Prevents notification spam by caching alert states
@@ -194,6 +220,12 @@ wrangler kv key put --binding=THRESHOLDS "HUMIDITY_MAX_LEVEL" "55" --preview fal
 
 # Set device offline timeout (seconds)
 wrangler kv key put --binding=THRESHOLDS "DEVICE_TIMEOUT" "1800" --preview false
+
+# Set tank empty depth threshold
+wrangler kv key put --binding=THRESHOLDS "DEPTH_MAX_LEVEL" "0.7" --preview false
+
+# Set tank full depth threshold
+wrangler kv key put --binding=THRESHOLDS "DEPTH_MIN_LEVEL" "0.171" --preview false
 ```
 
 #### Viewing Current Thresholds
@@ -210,6 +242,8 @@ The following thresholds are currently configured in KV storage:
 - **Freezer Temperature**: -5°C (23°F)
 - **Humidity Level**: 55%
 - **Device Timeout**: 1800 seconds (30 minutes)
+- **Tank Empty Depth**: 0.7
+- **Tank Full Depth**: 0.171
 
 #### How Threshold Changes Work
 
@@ -225,7 +259,7 @@ The following thresholds are currently configured in KV storage:
 **Example Timeline:**
 1. Change threshold from -10°C to -5°C via KV
 2. Dashboard immediately shows alert (temperature now exceeds new threshold)
-3. Wait up to 15 minutes for next cron execution
+3. Wait up to 5 minutes for next cron execution
 4. Cron detects new alert condition → sends Pushover → starts duration tracking
 5. Dashboard now shows "🚨 ALERT: Xm" with elapsed time
 
@@ -234,6 +268,8 @@ If KV values are not available, the system uses these built-in defaults:
 - **Freezer Temperature**: -5°C (23°F)
 - **Humidity Level**: 55%
 - **Device Timeout**: 1800 seconds (30 minutes)
+- **Tank Empty Depth**: 0.7
+- **Tank Full Depth**: 0.171
 
 ## Prerequisites
 
