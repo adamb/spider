@@ -257,3 +257,5 @@ Without Pushover credentials, the monitoring system will log errors but continue
 
 No manual deployment steps are required - the system uses GitHub integration for continuous deployment.
 
+Issues can also be handled by the Codex GitHub Action, which analyzes incoming issues and opens pull requests automatically.
+
